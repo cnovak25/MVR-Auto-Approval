@@ -1,16 +1,26 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf";
 import Tesseract from "tesseract.js";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@2.16.105/legacy/build/pdf.worker.min.js`;
 
 export default function MVRApprovalForm() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [passwordInput, setPasswordInput] = useState("");
   const [driverType, setDriverType] = useState("essential");
   const [driverName, setDriverName] = useState("");
   const [mvrFile, setMvrFile] = useState(null);
   const [insuranceFile, setInsuranceFile] = useState(null);
   const [dob, setDob] = useState("");
   const [result, setResult] = useState(null);
+
+  const login = () => {
+    if (passwordInput === "letmein") {
+      setIsAuthenticated(true);
+    } else {
+      alert("Incorrect password");
+    }
+  };
 
   const readTextFromPDF = async (file) => {
     try {
@@ -141,73 +151,24 @@ export default function MVRApprovalForm() {
     setResult(evaluation);
   };
 
-  return (
-    <div className="max-w-2xl mx-auto p-6 bg-white rounded shadow-md">
-      <h2 className="text-2xl font-bold mb-6">MVR Evaluation Form</h2>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block font-semibold mb-1">Driver Name:</label>
-          <input
-            type="text"
-            value={driverName}
-            onChange={(e) => setDriverName(e.target.value)}
-            required
-            className="w-full border border-gray-300 rounded px-3 py-2"
-            placeholder="Enter driver's full name"
-          />
-        </div>
+  if (!isAuthenticated) {
+    return (
+      <div className="max-w-md mx-auto mt-20 p-6 border rounded shadow">
+        <h2 className="text-xl font-bold mb-4">Restricted Access</h2>
+        <input
+          type="password"
+          placeholder="Enter password"
+          value={passwordInput}
+          onChange={(e) => setPasswordInput(e.target.value)}
+          className="w-full px-3 py-2 border rounded mb-4"
+        />
+        <button
+          onClick={login}
+          className="bg-blue-600 text-white px-4 py-2 rounded w-full"
+        >
+          Login
+        </button>
+      </div>
+    );
+  }
 
-        <div>
-          <label className="block font-semibold mb-1">Driver Type:</label>
-          <label className="mr-4">
-            <input type="radio" value="essential" checked={driverType === "essential"} onChange={() => setDriverType("essential")} className="mr-1" /> Essential
-          </label>
-          <label>
-            <input type="radio" value="non-essential" checked={driverType === "non-essential"} onChange={() => setDriverType("non-essential")} className="mr-1" /> Non-Essential
-          </label>
-        </div>
-
-        <div>
-          <label htmlFor="dob" className="block font-semibold mb-1">Date of Birth:</label>
-          <input type="date" id="dob" value={dob} onChange={(e) => setDob(e.target.value)} required className="w-full border border-gray-300 rounded px-3 py-2" />
-        </div>
-
-        <div>
-          <label htmlFor="mvr" className="block font-semibold mb-1">Upload MVR:</label>
-          <input type="file" id="mvr" accept="application/pdf,image/*" onChange={(e) => setMvrFile(e.target.files[0])} className="w-full" />
-        </div>
-
-        {driverType === "non-essential" && (
-          <div>
-            <label htmlFor="insurance" className="block font-semibold mb-1">Upload Proof of Insurance:</label>
-            <input type="file" id="insurance" accept="application/pdf,image/*" onChange={(e) => setInsuranceFile(e.target.files[0])} className="w-full" />
-          </div>
-        )}
-
-        <div className="flex space-x-4">
-          <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded">Submit for Evaluation</button>
-          <button type="button" onClick={exportCSV} className="bg-gray-300 px-4 py-2 rounded">Export Logs as CSV</button>
-        </div>
-      </form>
-
-      {result && (
-        <div className="mt-6 p-4 border border-gray-300 rounded bg-gray-50">
-          <h3 className="text-lg font-semibold mb-4">Evaluation Summary</h3>
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div><span className="font-semibold">Driver Name:</span> {result.driverName}</div>
-            <div><span className="font-semibold">DOB:</span> {dob}</div>
-            <div><span className="font-semibold">Age:</span> {result.age}</div>
-            <div><span className="font-semibold">Driver Type:</span> {driverType}</div>
-            <div><span className="font-semibold">Violations:</span> {result.violations}</div>
-            <div><span className="font-semibold">Accidents:</span> {result.accidents}</div>
-            <div><span className="font-semibold">Major Convictions:</span> {result.majorConvictions.join(", ") || "None"}</div>
-            <div><span className="font-semibold">Classification:</span> {result.classification}</div>
-            <div className="col-span-2 text-lg font-bold mt-2">
-              Final Verdict: <span className={result.finalVerdict === "Disqualified" ? "text-red-600" : "text-green-600"}>{result.finalVerdict}</span>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
