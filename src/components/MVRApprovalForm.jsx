@@ -572,10 +572,6 @@ Class: C	SINGLE VEH < 26K`;
               <strong>Age:</strong> {result.age || "Unknown"}
             </div>
             <div>
-              <strong>Classification:</strong> {result.classification}
-              <div className="text-sm text-gray-600">(Based on violation count/accident matrix only)</div>
-            </div>
-            <div>
               <strong>Violations:</strong> {result.violations}
             </div>
             <div>
@@ -607,7 +603,6 @@ Class: C	SINGLE VEH < 26K`;
               }`}>
                 {result.finalVerdict}
               </span>
-              <div className="text-sm text-gray-600 mt-1">(Considering all MVN policy requirements)</div>
             </div>
             <div className="md:col-span-2 text-sm text-gray-600 mt-2">
               <strong>Policy:</strong> {result.policy || "Moon Valley Nursery Driver Standards (June 2025)"}
