@@ -57,18 +57,79 @@ export default function MVRApprovalForm() {
                 }
               }
               
-              // Format 2: "Name:" followed by name on same or next line
-              if (lowerLine.includes('name:') || lowerLine.includes('name ')) {
+              // Format 2: "Driver Name:" pattern with name between "Driver Name:" and "DOB:"
+              if (lowerLine.includes('driver name:')) {
+                // Extract everything after "Driver Name:" and before "DOB:"
+                const driverNameMatch = line.match(/driver name:\s*(.+)/i);
+                if (driverNameMatch && driverNameMatch[1]) {
+                  let nameText = driverNameMatch[1].trim();
+                  
+                  // If there's more text on the same line, check if DOB is there
+                  const dobIndex = nameText.toLowerCase().indexOf('dob:');
+                  if (dobIndex !== -1) {
+                    nameText = nameText.substring(0, dobIndex).trim();
+                  }
+                  
+                  // Clean up the name - remove any trailing non-letter characters
+                  nameText = nameText.replace(/[^a-zA-Z\s]+$/, '').trim();
+                  
+                  if (nameText && nameText.length > 2) {
+                    detectedName = nameText;
+                  }
+                }
+                // If name might be on next line after "Driver Name:"
+                else if (i + 1 < lines.length) {
+                  const nextLine = lines[i + 1].trim();
+                  if (nextLine && nextLine.length > 2) {
+                    let nameText = nextLine;
+                    
+                    // Check if DOB is on the same line and remove it
+                    const dobIndex = nameText.toLowerCase().indexOf('dob:');
+                    if (dobIndex !== -1) {
+                      nameText = nameText.substring(0, dobIndex).trim();
+                    }
+                    
+                    // Clean up the name
+                    nameText = nameText.replace(/[^a-zA-Z\s]+$/, '').trim();
+                    
+                    if (nameText && /^[A-Z][a-z]+\s+[A-Z]/.test(nameText)) {
+                      detectedName = nameText;
+                    }
+                  }
+                }
+              }
+              
+              // Format 3: "Name:" followed by name on same or next line
+              if (!detectedName && (lowerLine.includes('name:') || lowerLine.includes('name '))) {
                 // Try to extract from same line first
                 const nameMatch = line.match(/name\s*[:\-]?\s*([A-Z][a-z]+\s+[A-Z][a-z]+.*)/i);
                 if (nameMatch && nameMatch[1]) {
-                  detectedName = nameMatch[1].trim();
+                  let nameText = nameMatch[1].trim();
+                  
+                  // Remove DOB if it's on the same line
+                  const dobIndex = nameText.toLowerCase().indexOf('dob:');
+                  if (dobIndex !== -1) {
+                    nameText = nameText.substring(0, dobIndex).trim();
+                  }
+                  
+                  // Clean up the name
+                  nameText = nameText.replace(/[^a-zA-Z\s]+$/, '').trim();
+                  detectedName = nameText;
                 }
                 // If not found on same line, try next line
                 else if (i + 1 < lines.length) {
                   const nextLine = lines[i + 1].trim();
                   if (nextLine && nextLine.length > 2 && /^[A-Z][a-z]+\s+[A-Z]/.test(nextLine)) {
-                    detectedName = nextLine;
+                    let nameText = nextLine;
+                    
+                    // Remove DOB if present
+                    const dobIndex = nameText.toLowerCase().indexOf('dob:');
+                    if (dobIndex !== -1) {
+                      nameText = nameText.substring(0, dobIndex).trim();
+                    }
+                    
+                    nameText = nameText.replace(/[^a-zA-Z\s]+$/, '').trim();
+                    detectedName = nameText;
                   }
                 }
               }
@@ -115,7 +176,7 @@ export default function MVRApprovalForm() {
                 }
               }
               
-              // Format 3: Direct name pattern detection (fallback)
+              // Format 4: Direct name pattern detection (fallback)
               if (!detectedName) {
                 const directNameMatch = line.match(/^([A-Z][a-z]+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)$/);
                 if (directNameMatch && directNameMatch[1] && 
@@ -124,8 +185,14 @@ export default function MVRApprovalForm() {
                     !lowerLine.includes('arizona') &&
                     !lowerLine.includes('license') &&
                     !lowerLine.includes('date') &&
-                    !lowerLine.includes('address')) {
-                  detectedName = directNameMatch[1].trim();
+                    !lowerLine.includes('address') &&
+                    !lowerLine.includes('dob:')) {
+                  let nameText = directNameMatch[1].trim();
+                  
+                  // Additional cleanup - ensure it's just a name
+                  if (nameText.split(' ').length >= 2 && nameText.split(' ').length <= 4) {
+                    detectedName = nameText;
+                  }
                 }
               }
             }
