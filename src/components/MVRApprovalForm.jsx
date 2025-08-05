@@ -282,8 +282,24 @@ export default function MVRApprovalForm() {
                   
                   nameText = nameText.replace(/[^a-zA-Z\s]+$/, '').trim();
                   
-                  // Validate it's actually a name
-                  if (nameText && nameText.split(' ').length >= 2 && nameText.split(' ').length <= 4) {
+                  // Validate it's actually a name - exclude addresses and common non-name patterns
+                  const lowerNameText = nameText.toLowerCase();
+                  const isNotAddress = !lowerNameText.includes('blvd') && 
+                                      !lowerNameText.includes('boulevard') &&
+                                      !lowerNameText.includes('street') &&
+                                      !lowerNameText.includes('st') &&
+                                      !lowerNameText.includes('ave') &&
+                                      !lowerNameText.includes('avenue') &&
+                                      !lowerNameText.includes('road') &&
+                                      !lowerNameText.includes('rd') &&
+                                      !lowerNameText.includes('lane') &&
+                                      !lowerNameText.includes('ste') &&
+                                      !lowerNameText.includes('suite') &&
+                                      !lowerNameText.includes('continental') &&
+                                      !lowerNameText.includes('segundo') &&
+                                      !lowerNameText.includes('el segundo');
+                  
+                  if (nameText && nameText.split(' ').length >= 2 && nameText.split(' ').length <= 4 && isNotAddress) {
                     detectedName = nameText;
                     console.log("✓ Name detected via general name pattern:", detectedName);
                     break;
@@ -458,16 +474,23 @@ export default function MVRApprovalForm() {
             
             // Final verification and logging
             console.log("🔍 BEFORE FINAL CHECK - detectedName:", detectedName);
+            console.log("🔍 Current driverName state:", driverName);
             
-            if (detectedName) {
+            // Only auto-set the name if the manual field is empty AND we detected a name
+            if (detectedName && !driverName.trim()) {
               // Clean up the detected name
               detectedName = detectedName.trim();
               console.log("🎯 FINAL: Name successfully detected and set:", detectedName);
               setDriverName(detectedName);
+            } else if (detectedName && driverName.trim()) {
+              console.log("🔒 MANUAL OVERRIDE: Keeping manually entered name:", driverName);
             } else {
               console.log("❌ FINAL: No name detected after all attempts");
               console.log("📋 First 10 lines for manual review:", lines.slice(0, 10));
-              setDriverName(""); // Ensure it's cleared
+              // Don't clear manually entered names
+              if (!driverName.trim()) {
+                setDriverName(""); // Only clear if it was empty to begin with
+              }
             }
             
             // Store license status in the text for later evaluation
@@ -878,6 +901,18 @@ export default function MVRApprovalForm() {
             className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-red-900 focus:outline-none transition-colors"
             required
           />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-2 text-gray-700">Driver Name (Manual Override)</label>
+          <input
+            type="text"
+            placeholder="Enter driver name if auto-detection fails"
+            value={driverName}
+            onChange={(e) => setDriverName(e.target.value)}
+            className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-red-900 focus:outline-none transition-colors"
+          />
+          <p className="text-sm text-gray-500 mt-1">Leave blank to use auto-detection from MVR document</p>
         </div>
 
         <div>
