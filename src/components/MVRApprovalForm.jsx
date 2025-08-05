@@ -42,6 +42,8 @@ export default function MVRApprovalForm() {
             // Enhanced name detection for various MVR formats
             const lines = text.split('\n');
             let detectedName = null;
+            let licenseStatus = null;
+            let licenseStatusExplanation = null;
             
             for (let i = 0; i < lines.length; i++) {
               const line = lines[i].trim();
@@ -52,7 +54,6 @@ export default function MVRApprovalForm() {
                 const nextLine = lines[i + 1].trim();
                 if (nextLine && nextLine.length > 2) {
                   detectedName = nextLine;
-                  break;
                 }
               }
               
@@ -62,34 +63,57 @@ export default function MVRApprovalForm() {
                 const nameMatch = line.match(/name\s*[:\-]?\s*([A-Z][a-z]+\s+[A-Z][a-z]+.*)/i);
                 if (nameMatch && nameMatch[1]) {
                   detectedName = nameMatch[1].trim();
-                  break;
                 }
                 // If not found on same line, try next line
                 else if (i + 1 < lines.length) {
                   const nextLine = lines[i + 1].trim();
                   if (nextLine && nextLine.length > 2 && /^[A-Z][a-z]+\s+[A-Z]/.test(nextLine)) {
                     detectedName = nextLine;
-                    break;
                   }
                 }
               }
               
+              // License Status Detection
+              if (lowerLine.includes('status:') || lowerLine.startsWith('status:')) {
+                const statusMatch = line.match(/status:\s*([A-Z]+)/i);
+                if (statusMatch && statusMatch[1]) {
+                  licenseStatus = statusMatch[1].toUpperCase();
+                }
+              }
+              
+              // License Status Explanation Detection
+              if (lowerLine.includes('license status explanation:') || lowerLine.includes('status explanation:')) {
+                const explanationMatch = line.match(/(?:license\s+)?status\s+explanation:\s*(.+)/i);
+                if (explanationMatch && explanationMatch[1]) {
+                  licenseStatusExplanation = explanationMatch[1].trim();
+                }
+              }
+              
               // Format 3: Direct name pattern detection (fallback)
-              const directNameMatch = line.match(/^([A-Z][a-z]+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)$/);
-              if (directNameMatch && directNameMatch[1] && 
-                  !lowerLine.includes('california') && 
-                  !lowerLine.includes('texas') && 
-                  !lowerLine.includes('arizona') &&
-                  !lowerLine.includes('license') &&
-                  !lowerLine.includes('date') &&
-                  !lowerLine.includes('address')) {
-                detectedName = directNameMatch[1].trim();
-                break;
+              if (!detectedName) {
+                const directNameMatch = line.match(/^([A-Z][a-z]+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)$/);
+                if (directNameMatch && directNameMatch[1] && 
+                    !lowerLine.includes('california') && 
+                    !lowerLine.includes('texas') && 
+                    !lowerLine.includes('arizona') &&
+                    !lowerLine.includes('license') &&
+                    !lowerLine.includes('date') &&
+                    !lowerLine.includes('address')) {
+                  detectedName = directNameMatch[1].trim();
+                }
               }
             }
             
             if (detectedName) {
               setDriverName(detectedName);
+            }
+            
+            // Store license status in the text for later evaluation
+            if (licenseStatus || licenseStatusExplanation) {
+              text += `\n__LICENSE_STATUS__: ${licenseStatus || 'UNKNOWN'}`;
+              if (licenseStatusExplanation) {
+                text += `\n__LICENSE_STATUS_EXPLANATION__: ${licenseStatusExplanation}`;
+              }
             }
             
             resolve(text);
@@ -237,6 +261,13 @@ export default function MVRApprovalForm() {
     const birthYear = dobMatch ? parseInt(dobMatch[1], 10) : null;
     const age = birthYear ? new Date().getFullYear() - birthYear : null;
 
+    // Extract license status information
+    const licenseStatusMatch = text.match(/__LICENSE_STATUS__:\s*([A-Z]+)/);
+    const licenseStatus = licenseStatusMatch ? licenseStatusMatch[1] : null;
+    
+    const licenseStatusExplanationMatch = text.match(/__LICENSE_STATUS_EXPLANATION__:\s*(.+)/);
+    const licenseStatusExplanation = licenseStatusExplanationMatch ? licenseStatusExplanationMatch[1] : null;
+
     // Moon Valley Nursery Policy - Major Convictions
     const majorConvictions = [
       // Generic terms
@@ -271,6 +302,11 @@ export default function MVRApprovalForm() {
     // Moon Valley Nursery Policy Implementation
     let disqualified = false;
     let disqualificationReasons = [];
+
+    // Check license status - suspended/revoked license is automatic disqualification
+    if (licenseStatus && (licenseStatus === 'SUSPENDED' || licenseStatus === 'REVOKED' || licenseStatus === 'CANCELLED')) {
+      disqualificationReasons.push(`License Status: ${licenseStatus}${licenseStatusExplanation ? ` (${licenseStatusExplanation})` : ''}`);
+    }
 
     if (driverType === "essential") {
       // Essential Driver Requirements (MVN Policy Section 4 & 6)
@@ -328,6 +364,8 @@ export default function MVRApprovalForm() {
       classification,
       violations,
       accidents,
+      licenseStatus: licenseStatus || "Not specified",
+      licenseStatusExplanation: licenseStatusExplanation || "",
       majorConvictions: foundConvictions,
       finalVerdict: disqualified ? "Disqualified" : classification,
       disqualificationReasons: disqualificationReasons,
@@ -352,6 +390,8 @@ export default function MVRApprovalForm() {
       "classification",
       "violations",
       "accidents",
+      "licenseStatus",
+      "licenseStatusExplanation",
       "majorConvictions",
       "finalVerdict",
       "disqualificationReasons",
@@ -513,6 +553,24 @@ export default function MVRApprovalForm() {
               <strong className="text-gray-700">Accidents:</strong> 
               <div className="text-gray-900 font-medium">{result.accidents}</div>
             </div>
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <strong className="text-gray-700">License Status:</strong> 
+              <div className={`font-medium ${
+                result.licenseStatus === 'SUSPENDED' || result.licenseStatus === 'REVOKED' || result.licenseStatus === 'CANCELLED'
+                  ? 'text-red-600' 
+                  : result.licenseStatus === 'VALID' || result.licenseStatus === 'ACTIVE'
+                  ? 'text-green-600'
+                  : 'text-gray-900'
+              }`}>
+                {result.licenseStatus}
+              </div>
+            </div>
+            {result.licenseStatusExplanation && (
+              <div className="bg-gray-50 p-4 rounded-lg md:col-span-2">
+                <strong className="text-gray-700">License Status Details:</strong> 
+                <div className="text-gray-900 font-medium">{result.licenseStatusExplanation}</div>
+              </div>
+            )}
             <div className="bg-gray-50 p-4 rounded-lg md:col-span-2">
               <strong className="text-gray-700">Major Convictions:</strong> 
               <div className="text-gray-900 font-medium">{result.majorConvictions.length > 0 ? result.majorConvictions.join(", ") : "None"}</div>
