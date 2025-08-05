@@ -165,18 +165,65 @@ export default function MVRApprovalForm() {
                 }
               }
               
-              // License Status Explanation Detection - handle various formats
+              // License Status Explanation Detection - extract key status words only
               if (lowerLine.includes('license status explanation:') || lowerLine.includes('status explanation:')) {
                 const explanationMatch = line.match(/(?:license\s+)?status\s+explanation:\s*(.+)/i);
                 if (explanationMatch && explanationMatch[1]) {
-                  licenseStatusExplanation = explanationMatch[1].trim();
+                  let explanation = explanationMatch[1].trim();
+                  // Extract key status words from explanation
+                  if (explanation.toLowerCase().includes('susp')) {
+                    licenseStatusExplanation = "SUSPENDED";
+                  } else if (explanation.toLowerCase().includes('revk') || explanation.toLowerCase().includes('revoked')) {
+                    licenseStatusExplanation = "REVOKED";
+                  } else if (explanation.toLowerCase().includes('valid')) {
+                    licenseStatusExplanation = "VALID";
+                  } else if (explanation.toLowerCase().includes('expired')) {
+                    licenseStatusExplanation = "EXPIRED";
+                  } else if (explanation.toLowerCase().includes('cancelled')) {
+                    licenseStatusExplanation = "CANCELLED";
+                  } else {
+                    // Keep first word only if it's a status-like term
+                    const firstWord = explanation.split(/\s+/)[0].toUpperCase();
+                    if (/^(MANDATORY|VOLUNTARY|ACTIVE|INACTIVE)$/.test(firstWord)) {
+                      licenseStatusExplanation = null; // Don't show these generic terms
+                    } else {
+                      licenseStatusExplanation = firstWord;
+                    }
+                  }
                 }
                 // If explanation is on next line
                 else if (i + 1 < lines.length) {
                   const nextLine = lines[i + 1].trim();
                   if (nextLine && nextLine.length > 2) {
-                    licenseStatusExplanation = nextLine;
+                    let explanation = nextLine;
+                    // Extract key status words from explanation
+                    if (explanation.toLowerCase().includes('susp')) {
+                      licenseStatusExplanation = "SUSPENDED";
+                    } else if (explanation.toLowerCase().includes('revk') || explanation.toLowerCase().includes('revoked')) {
+                      licenseStatusExplanation = "REVOKED";
+                    } else if (explanation.toLowerCase().includes('valid')) {
+                      licenseStatusExplanation = "VALID";
+                    } else if (explanation.toLowerCase().includes('expired')) {
+                      licenseStatusExplanation = "EXPIRED";
+                    } else if (explanation.toLowerCase().includes('cancelled')) {
+                      licenseStatusExplanation = "CANCELLED";
+                    } else {
+                      // Keep first word only if it's a status-like term
+                      const firstWord = explanation.split(/\s+/)[0].toUpperCase();
+                      if (/^(MANDATORY|VOLUNTARY|ACTIVE|INACTIVE)$/.test(firstWord)) {
+                        licenseStatusExplanation = null; // Don't show these generic terms
+                      } else {
+                        licenseStatusExplanation = firstWord;
+                      }
+                    }
                   }
+                }
+              }
+              
+              // Additional check for "MANDATORY SUSP/REVK" patterns
+              if (lowerLine.includes('mandatory susp') || lowerLine.includes('susp/revk')) {
+                if (lowerLine.includes('susp')) {
+                  licenseStatusExplanation = "SUSPENDED";
                 }
               }
               
@@ -728,10 +775,18 @@ export default function MVRApprovalForm() {
                 {result.licenseStatus}
               </div>
             </div>
-            {result.licenseStatusExplanation && (
+            {result.licenseStatusExplanation && result.licenseStatusExplanation !== result.licenseStatus && (
               <div className="bg-gray-50 p-4 rounded-lg md:col-span-2">
                 <strong className="text-gray-700">License Status Details:</strong> 
-                <div className="text-gray-900 font-medium">{result.licenseStatusExplanation}</div>
+                <div className={`font-medium ${
+                  result.licenseStatusExplanation === 'SUSPENDED' || result.licenseStatusExplanation === 'REVOKED' || result.licenseStatusExplanation === 'CANCELLED'
+                    ? 'text-red-600' 
+                    : result.licenseStatusExplanation === 'VALID'
+                    ? 'text-green-600'
+                    : 'text-gray-900'
+                }`}>
+                  {result.licenseStatusExplanation}
+                </div>
               </div>
             )}
             <div className="bg-gray-50 p-4 rounded-lg md:col-span-2">
