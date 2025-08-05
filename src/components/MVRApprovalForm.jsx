@@ -573,7 +573,7 @@ Class: C	SINGLE VEH < 26K`;
             </div>
             <div>
               <strong>Classification:</strong> {result.classification}
-              <div className="text-sm text-gray-600">(Based on violation/accident matrix only)</div>
+              <div className="text-sm text-gray-600">(Based on violation count/accident matrix only)</div>
             </div>
             <div>
               <strong>Violations:</strong> {result.violations}
