@@ -308,23 +308,37 @@ export default function MVRApprovalForm() {
               }
               
               // License Status Detection - handle various formats
-              if (lowerLine.includes('status:') || lowerLine.startsWith('status:')) {
+              if (lowerLine.includes('status:') || lowerLine.startsWith('status:') || lowerLine.includes('license status')) {
+                console.log("🔍 Found license status line:", line);
+                
                 // First try to get status from same line
-                const statusMatch = line.match(/status:\s*([A-Z]{4,})/i);
+                const statusMatch = line.match(/(?:license\s+)?status:\s*([A-Z]{4,})/i);
                 if (statusMatch && statusMatch[1] && statusMatch[1].length > 3) {
                   const status = statusMatch[1].toUpperCase();
+                  console.log("📋 Checking status from same line:", status);
                   // Only accept valid status values
                   if (/^(VALID|ACTIVE|SUSPENDED|REVOKED|CANCELLED|EXPIRED)$/i.test(status)) {
                     licenseStatus = status;
+                    console.log("✅ License status detected (same line):", licenseStatus);
                   }
                 }
                 // If status is on next line (like "Status: SUSPENDED")
                 else if (i + 1 < lines.length) {
                   const nextLine = lines[i + 1].trim();
+                  console.log("📋 Checking next line for status:", nextLine);
                   if (nextLine && /^[A-Z]{4,}$/.test(nextLine)) {
                     const status = nextLine.toUpperCase();
                     if (/^(VALID|ACTIVE|SUSPENDED|REVOKED|CANCELLED|EXPIRED)$/i.test(status)) {
                       licenseStatus = status;
+                      console.log("✅ License status detected (next line):", licenseStatus);
+                    }
+                  }
+                  // Also check for mixed case or different patterns
+                  else if (nextLine && nextLine.length >= 4) {
+                    const status = nextLine.toUpperCase();
+                    if (/^(VALID|ACTIVE|SUSPENDED|REVOKED|CANCELLED|EXPIRED)$/i.test(status)) {
+                      licenseStatus = status;
+                      console.log("✅ License status detected (mixed case):", licenseStatus);
                     }
                   }
                 }
@@ -407,11 +421,46 @@ export default function MVRApprovalForm() {
               if (!licenseStatus && lowerLine.includes('license') && 
                   (lowerLine.includes('valid') || lowerLine.includes('suspended') || 
                    lowerLine.includes('revoked') || lowerLine.includes('active'))) {
+                console.log("🔍 Found license line with status keywords:", line);
                 const statusWords = ['VALID', 'ACTIVE', 'SUSPENDED', 'REVOKED', 'CANCELLED', 'EXPIRED'];
                 for (const status of statusWords) {
                   if (lowerLine.includes(status.toLowerCase())) {
                     licenseStatus = status;
+                    console.log("✅ License status detected (keyword search):", licenseStatus);
                     break;
+                  }
+                }
+              }
+              
+              // Look for standalone status patterns like "Valid", "Active", etc.
+              if (!licenseStatus && /^(Valid|Active|Suspended|Revoked|Cancelled|Expired)$/i.test(line.trim())) {
+                // Check if this appears after a status-related line
+                for (let j = Math.max(0, i - 3); j < i; j++) {
+                  const prevLine = lines[j].toLowerCase();
+                  if (prevLine.includes('status') || prevLine.includes('license')) {
+                    licenseStatus = line.trim().toUpperCase();
+                    console.log("✅ License status detected (standalone):", licenseStatus);
+                    break;
+                  }
+                }
+              }
+              
+              // Look for "Current Status:" or similar patterns
+              if (!licenseStatus && (lowerLine.includes('current status') || lowerLine.includes('driver license status'))) {
+                console.log("🔍 Found current status line:", line);
+                // Extract status from same line or next line
+                const statusMatch = line.match(/(?:current\s+status|driver\s+license\s+status):\s*([a-z]+)/i);
+                if (statusMatch && statusMatch[1]) {
+                  const status = statusMatch[1].toUpperCase();
+                  if (/^(VALID|ACTIVE|SUSPENDED|REVOKED|CANCELLED|EXPIRED)$/i.test(status)) {
+                    licenseStatus = status;
+                    console.log("✅ License status detected (current status):", licenseStatus);
+                  }
+                } else if (i + 1 < lines.length) {
+                  const nextLine = lines[i + 1].trim();
+                  if (nextLine && /^(valid|active|suspended|revoked|cancelled|expired)$/i.test(nextLine)) {
+                    licenseStatus = nextLine.toUpperCase();
+                    console.log("✅ License status detected (current status next line):", licenseStatus);
                   }
                 }
               }
@@ -475,6 +524,8 @@ export default function MVRApprovalForm() {
             // Final verification and logging
             console.log("🔍 BEFORE FINAL CHECK - detectedName:", detectedName);
             console.log("🔍 Current driverName state:", driverName);
+            console.log("🔍 FINAL LICENSE STATUS - licenseStatus:", licenseStatus);
+            console.log("🔍 FINAL LICENSE STATUS EXPLANATION - licenseStatusExplanation:", licenseStatusExplanation);
             
             // Only auto-set the name if the manual field is empty AND we detected a name
             if (detectedName && !driverName.trim()) {
