@@ -220,7 +220,7 @@ export default function MVRApprovalForm() {
 
     // Moon Valley Nursery Policy Implementation
     let disqualified = false;
-    let disqualificationReason = "";
+    let disqualificationReasons = [];
 
     if (driverType === "essential") {
       // Essential Driver Requirements (MVN Policy Section 4 & 6)
@@ -228,26 +228,22 @@ export default function MVRApprovalForm() {
       // Age requirement: 25 years, or 21 years with ≥3 years experience and no violations
       // Note: We can't verify driving experience from MVR, so enforcing 25 minimum for simplicity
       if (age < 25) {
-        disqualified = true;
-        disqualificationReason = "Under 25 years old (Essential Driver requirement)";
+        disqualificationReasons.push("Under 25 years old (Essential Driver requirement)");
       }
       
       // Major conviction in past 5 years disqualifies Essential drivers
-      else if (foundConvictions.length > 0) {
-        disqualified = true;
-        disqualificationReason = "Major conviction found (5-year lookback for Essential)";
+      if (foundConvictions.length > 0) {
+        disqualificationReasons.push(`Major conviction found: ${foundConvictions.join(", ")} (5-year lookback for Essential)`);
       }
       
       // Essential drivers must be Clear or Acceptable (not Probationary or Unacceptable)
-      else if (classification === "Probationary" || classification === "Unacceptable") {
-        disqualified = true;
-        disqualificationReason = `Classification: ${classification} (Essential drivers require Clear/Acceptable)`;
+      if (classification === "Probationary" || classification === "Unacceptable") {
+        disqualificationReasons.push(`Classification: ${classification} (Essential drivers require Clear/Acceptable)`);
       }
       
       // ≥3 accidents or violations in past 3 years disqualifies
-      else if (violations + accidents >= 3) {
-        disqualified = true;
-        disqualificationReason = "3+ violations/accidents in past 3 years";
+      if (violations + accidents >= 3) {
+        disqualificationReasons.push(`${violations + accidents} violations/accidents in past 3 years (Essential limit: 2)`);
       }
       
     } else {
@@ -255,25 +251,24 @@ export default function MVRApprovalForm() {
       
       // Age requirement: 21 years minimum
       if (age < 21) {
-        disqualified = true;
-        disqualificationReason = "Under 21 years old (Non-Essential Driver requirement)";
+        disqualificationReasons.push("Under 21 years old (Non-Essential Driver requirement)");
       }
       
       // Major conviction in past 3 years disqualifies Non-Essential drivers
       // Note: We're checking if violations contain recent dates, but this is approximate
-      else if (foundConvictions.length > 0) {
+      if (foundConvictions.length > 0) {
         // For simplicity, we'll disqualify if any major conviction is found
         // In a real implementation, you'd need to parse conviction dates
-        disqualified = true;
-        disqualificationReason = "Major conviction found (3-year lookback for Non-Essential)";
+        disqualificationReasons.push(`Major conviction found: ${foundConvictions.join(", ")} (3-year lookback for Non-Essential)`);
       }
       
       // Non-Essential drivers may be Clear, Acceptable, or Probationary (not Unacceptable)
-      else if (classification === "Unacceptable") {
-        disqualified = true;
-        disqualificationReason = `Classification: ${classification} (Non-Essential allows up to Probationary)`;
+      if (classification === "Unacceptable") {
+        disqualificationReasons.push(`Classification: ${classification} (Non-Essential allows up to Probationary)`);
       }
     }
+
+    disqualified = disqualificationReasons.length > 0;
 
     const evaluation = {
       timestamp: new Date().toISOString(),
@@ -285,7 +280,8 @@ export default function MVRApprovalForm() {
       accidents,
       majorConvictions: foundConvictions,
       finalVerdict: disqualified ? "Disqualified" : classification,
-      disqualificationReason: disqualified ? disqualificationReason : null,
+      disqualificationReasons: disqualificationReasons,
+      disqualificationReason: disqualificationReasons.join("; "), // For backward compatibility
       policy: "Moon Valley Nursery Driver Standards (June 2025)"
     };
 
@@ -308,6 +304,7 @@ export default function MVRApprovalForm() {
       "accidents",
       "majorConvictions",
       "finalVerdict",
+      "disqualificationReasons",
       "disqualificationReason",
       "policy"
     ];
@@ -576,6 +573,7 @@ Class: C	SINGLE VEH < 26K`;
             </div>
             <div>
               <strong>Classification:</strong> {result.classification}
+              <div className="text-sm text-gray-600">(Based on violation/accident matrix only)</div>
             </div>
             <div>
               <strong>Violations:</strong> {result.violations}
@@ -586,10 +584,14 @@ Class: C	SINGLE VEH < 26K`;
             <div className="md:col-span-2">
               <strong>Major Convictions:</strong> {result.majorConvictions.length > 0 ? result.majorConvictions.join(", ") : "None"}
             </div>
-            {result.disqualificationReason && (
+            {result.disqualificationReasons && result.disqualificationReasons.length > 0 && (
               <div className="md:col-span-2">
-                <strong>Disqualification Reason:</strong> 
-                <span className="ml-2 text-red-600">{result.disqualificationReason}</span>
+                <strong>Disqualification Reasons:</strong> 
+                <div className="ml-2 text-red-600">
+                  {result.disqualificationReasons.map((reason, index) => (
+                    <div key={index} className="mb-1">• {reason}</div>
+                  ))}
+                </div>
               </div>
             )}
             <div className="md:col-span-2">
@@ -605,6 +607,7 @@ Class: C	SINGLE VEH < 26K`;
               }`}>
                 {result.finalVerdict}
               </span>
+              <div className="text-sm text-gray-600 mt-1">(Considering all MVN policy requirements)</div>
             </div>
             <div className="md:col-span-2 text-sm text-gray-600 mt-2">
               <strong>Policy:</strong> {result.policy || "Moon Valley Nursery Driver Standards (June 2025)"}
