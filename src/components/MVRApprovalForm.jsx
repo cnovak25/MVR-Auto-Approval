@@ -137,15 +137,22 @@ export default function MVRApprovalForm() {
               // License Status Detection - handle various formats
               if (lowerLine.includes('status:') || lowerLine.startsWith('status:')) {
                 // First try to get status from same line
-                const statusMatch = line.match(/status:\s*([A-Z]+)/i);
-                if (statusMatch && statusMatch[1]) {
-                  licenseStatus = statusMatch[1].toUpperCase();
+                const statusMatch = line.match(/status:\s*([A-Z]{4,})/i);
+                if (statusMatch && statusMatch[1] && statusMatch[1].length > 3) {
+                  const status = statusMatch[1].toUpperCase();
+                  // Only accept valid status values
+                  if (/^(VALID|ACTIVE|SUSPENDED|REVOKED|CANCELLED|EXPIRED)$/i.test(status)) {
+                    licenseStatus = status;
+                  }
                 }
                 // If status is on next line (like "Status: SUSPENDED")
                 else if (i + 1 < lines.length) {
                   const nextLine = lines[i + 1].trim();
-                  if (nextLine && /^[A-Z]+$/.test(nextLine)) {
-                    licenseStatus = nextLine.toUpperCase();
+                  if (nextLine && /^[A-Z]{4,}$/.test(nextLine)) {
+                    const status = nextLine.toUpperCase();
+                    if (/^(VALID|ACTIVE|SUSPENDED|REVOKED|CANCELLED|EXPIRED)$/i.test(status)) {
+                      licenseStatus = status;
+                    }
                   }
                 }
               }
@@ -172,6 +179,19 @@ export default function MVRApprovalForm() {
                   const nextLine = lines[i + 1].trim();
                   if (nextLine && nextLine.length > 2) {
                     licenseStatusExplanation = nextLine;
+                  }
+                }
+              }
+              
+              // Additional license status detection in license sections
+              if (!licenseStatus && lowerLine.includes('license') && 
+                  (lowerLine.includes('valid') || lowerLine.includes('suspended') || 
+                   lowerLine.includes('revoked') || lowerLine.includes('active'))) {
+                const statusWords = ['VALID', 'ACTIVE', 'SUSPENDED', 'REVOKED', 'CANCELLED', 'EXPIRED'];
+                for (const status of statusWords) {
+                  if (lowerLine.includes(status.toLowerCase())) {
+                    licenseStatus = status;
+                    break;
                   }
                 }
               }
