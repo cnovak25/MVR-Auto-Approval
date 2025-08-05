@@ -75,42 +75,74 @@ export default function MVRApprovalForm() {
   };
 
   const countActualViolationsAndAccidents = (text) => {
-    // Improved parsing logic to avoid false positives from column headers
-    const lines = text.toLowerCase().split('\n');
+    // Enhanced parsing logic for California DMV format
+    const lines = text.split('\n');
     let violations = 0;
     let accidents = 0;
+    let inViolationsSection = false;
+    let inAccidentsSection = false;
     
-    // Look for actual violation/accident entries, not just headers
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
+      const lowerLine = line.toLowerCase();
       
-      // Skip obvious header lines
-      if (line === 'violations' || line === 'accidents' || 
-          line === 'violation' || line === 'accident' ||
-          line.includes('violation type') || line.includes('accident type') ||
-          line.includes('violation date') || line.includes('accident date')) {
+      // Detect section headers
+      if (lowerLine.includes('violations/convictions') || lowerLine.includes('violations') && lowerLine.includes('accidents')) {
+        inViolationsSection = true;
+        inAccidentsSection = false;
         continue;
       }
       
-      // Look for "None To Report" patterns
-      if (line.includes('none to report') || line.includes('no violations') || 
-          line.includes('no accidents') || line.includes('clean record')) {
+      if (lowerLine.includes('suspensions/revocations') || lowerLine.includes('license and permit')) {
+        inViolationsSection = false;
+        inAccidentsSection = false;
         continue;
       }
       
-      // Look for actual violation/accident entries with dates, locations, or specific details
-      if (line.includes('violation') && 
-          (line.match(/\d{2}\/\d{2}\/\d{4}/) || line.match(/\d{4}-\d{2}-\d{2}/) || 
-           line.includes('speeding') || line.includes('parking') || 
-           line.includes('moving') || line.includes('equipment'))) {
-        violations++;
+      // Skip table headers
+      if (lowerLine.includes('type') && lowerLine.includes('viol') && lowerLine.includes('conv')) {
+        continue;
       }
       
-      if (line.includes('accident') && 
-          (line.match(/\d{2}\/\d{2}\/\d{4}/) || line.match(/\d{4}-\d{2}-\d{2}/) || 
-           line.includes('collision') || line.includes('property damage') || 
-           line.includes('injury') || line.includes('at fault'))) {
+      // Look for actual violation entries in the violations section
+      if (inViolationsSection && line.length > 0) {
+        // California DMV format: ABS	08/21/2023	09/20/2023	B50	DC06	4000A1	UNREGISTERED VEHICLE...
+        // Check for date patterns and violation codes
+        const datePattern = /\d{2}\/\d{2}\/\d{4}/;
+        const hasDate = datePattern.test(line);
+        
+        // Skip lines that are clearly not violation entries
+        if (lowerLine.includes('description') || lowerLine.includes('location') || 
+            lowerLine.includes('ticket') || lowerLine.includes('plate') ||
+            line.startsWith('-') || line.length < 10) {
+          continue;
+        }
+        
+        // Look for violation entries - they typically start with a code and have dates
+        if (hasDate && (
+          line.includes('ABS') || line.includes('CONV') || 
+          lowerLine.includes('driving') || lowerLine.includes('vehicle') ||
+          lowerLine.includes('speed') || lowerLine.includes('dui') ||
+          lowerLine.includes('license') || lowerLine.includes('registration') ||
+          lowerLine.includes('insurance') || lowerLine.includes('equipment')
+        )) {
+          violations++;
+        }
+      }
+      
+      // Look for accident entries
+      if (lowerLine.includes('accident') && 
+          (lowerLine.includes('at fault') || lowerLine.includes('collision') ||
+           lowerLine.includes('property damage') || lowerLine.includes('injury'))) {
         accidents++;
+      }
+      
+      // Alternative accident detection - look for accident-specific codes or descriptions
+      if (inViolationsSection && line.length > 0) {
+        if (lowerLine.includes('accident') || lowerLine.includes('collision') ||
+            lowerLine.includes('crash') || (lowerLine.includes('at fault') && lowerLine.includes('yes'))) {
+          accidents++;
+        }
       }
     }
     
@@ -124,9 +156,12 @@ export default function MVRApprovalForm() {
 
     const majorConvictions = [
       "DUI", "DWI", "reckless driving", "vehicular assault", "homicide",
-      "hit and run", "leaving the scene", "driving while suspended", "open container"
+      "hit and run", "leaving the scene", "driving while suspended", "open container",
+      "23152B", "23152A", "BAC", "blood alcohol", "driving with bac"
     ];
-    const foundConvictions = majorConvictions.filter(term => text.toLowerCase().includes(term.toLowerCase()));
+    const foundConvictions = majorConvictions.filter(term => 
+      text.toLowerCase().includes(term.toLowerCase())
+    );
 
     // Use improved parsing logic to avoid false positives
     const { violations, accidents } = countActualViolationsAndAccidents(text);
@@ -243,6 +278,61 @@ export default function MVRApprovalForm() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        <div>
+          <button
+            type="button"
+            onClick={() => {
+              const sampleMVR = `Profile Information
+Name:  	Edgar Navarro
+Reference:	 N. Hollywood
+* Document(s) Attached
+ 	 	 	 
+ 
+The following are included in this report:
+Search Type   	Detail   	Status   
+Motor Vehicle Records Search   	California (license F7895107)    	Complete
+ 
+Motor Vehicle Records Search
+State	 	California
+License	 	F7895107
+Name Searched	 	Edgar Navarro
+Search ID	 	2371838
+Reference	 	N. Hollywood
+Date Ordered	 	07/31/2025
+Date Completed	 	07/31/2025
+Results
+CALIFORNIADriver Record - D2523	Order Date: 07/31/2025	Seq #: 0
+Host Used:	Online	Bill Code:	
+Rec Type:	STANDARD	Reference:	
+License:	F7895107
+Name:	NAVARROCARBAJAL, EDGAR ULISES
+Address:	
+City, St:	
+Sex:	MALE	Weight:	150lbs.	DOB:	10/18/1996		
+Eyes:	BROWN	Height:	5'08"	Iss Date:	10/20/2023		
+Hair:	BROWN			Exp Date:	10/18/2028		
+Approx. Year Lic. First Issued: 2013	STATUS:SEE BELOW
+MVR Score: 1 STANDARD
+Violations/ConvictionsFailures To Appear Accidents
+TYPE	VIOL	CONV	ACD	AVD	V/C	DESCRIPTION	C	LOCATION	TICKET	PLATE	AT FAULT	PT
+ABS	08/21/2023	09/20/2023	B50	DC06	4000A1	UNREGISTERED VEHICLE-ON/OFF HWY	N	SAN BENITO	2303291	8TRL681		0	
+ABS	07/07/2024	10/16/2024	A08	CB03	23152B	DRIVING WITH BAC OF .08 OR MORE	N	SALINAS	R005603	8PNK628		2	
+-	UE08	23593A	ADDITIONAL COURT-IMPOSED ORDERS	N						
+Suspensions/Revocations
+ACTIONS	ORD/DATE	EFF/DATE	CLEAR/DATE	END/DATE	CODE	AVD	DESCRIPTION	NEW SUSP
+SUSPENSION	12/24/2024	01/02/2025		02/19/2025	96A	CA02	IMMEDIATE SUSP-EXCESSIVE BLOOD ALCH`;
+              
+              console.log("Testing with sample MVR data");
+              const evaluation = evaluateMVR(sampleMVR);
+              setResult(evaluation);
+              setDriverName("Edgar Navarro");
+            }}
+            className="bg-purple-600 text-white px-4 py-2 rounded mb-4"
+          >
+            Test with Sample MVR
+          </button>
+        </div>
+        
         <div>
           <label className="block text-sm font-medium mb-2">Driver Type</label>
           <select
