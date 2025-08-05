@@ -49,6 +49,17 @@ export default function MVRApprovalForm() {
             console.log("PDF Text Lines (first 30):", lines.slice(0, 30));
             console.log("Full PDF text sample:", text.substring(0, 1000));
             
+            // Additional debug: Look for any lines containing status-related keywords
+            console.log("🔍 Scanning for license status keywords in document...");
+            for (let k = 0; k < Math.min(lines.length, 100); k++) {
+              const testLine = lines[k].toLowerCase().trim();
+              if (testLine.includes('status') || testLine.includes('license') || 
+                  testLine.includes('valid') || testLine.includes('active') || 
+                  testLine.includes('suspended') || testLine.includes('revoked')) {
+                console.log(`Line ${k}: "${lines[k]}"`);
+              }
+            }
+            
             for (let i = 0; i < lines.length; i++) {
               const line = lines[i].trim();
               const lowerLine = line.toLowerCase();
@@ -461,6 +472,45 @@ export default function MVRApprovalForm() {
                   if (nextLine && /^(valid|active|suspended|revoked|cancelled|expired)$/i.test(nextLine)) {
                     licenseStatus = nextLine.toUpperCase();
                     console.log("✅ License status detected (current status next line):", licenseStatus);
+                  }
+                }
+              }
+              
+              // Look for simple "License:" followed by status
+              if (!licenseStatus && lowerLine.includes('license:')) {
+                console.log("🔍 Found license field:", line);
+                const licenseMatch = line.match(/license:\s*([a-z]+)/i);
+                if (licenseMatch && licenseMatch[1]) {
+                  const status = licenseMatch[1].toUpperCase();
+                  if (/^(VALID|ACTIVE|SUSPENDED|REVOKED|CANCELLED|EXPIRED)$/i.test(status)) {
+                    licenseStatus = status;
+                    console.log("✅ License status detected (license field):", licenseStatus);
+                  }
+                }
+              }
+              
+              // Look for patterns like "Valid License", "Active License", etc.
+              if (!licenseStatus && lowerLine.includes('license')) {
+                const licenseStatusWords = ['valid license', 'active license', 'suspended license', 'revoked license', 'expired license', 'cancelled license'];
+                for (const pattern of licenseStatusWords) {
+                  if (lowerLine.includes(pattern)) {
+                    licenseStatus = pattern.split(' ')[0].toUpperCase();
+                    console.log("✅ License status detected (descriptive):", licenseStatus);
+                    break;
+                  }
+                }
+              }
+              
+              // Look for tabular data with license status
+              if (!licenseStatus && (lowerLine.includes('class') || lowerLine.includes('type')) && 
+                  (lowerLine.includes('valid') || lowerLine.includes('active') || lowerLine.includes('suspended'))) {
+                console.log("🔍 Found potential license table row:", line);
+                const tableStatusWords = ['VALID', 'ACTIVE', 'SUSPENDED', 'REVOKED', 'CANCELLED', 'EXPIRED'];
+                for (const status of tableStatusWords) {
+                  if (lowerLine.includes(status.toLowerCase())) {
+                    licenseStatus = status;
+                    console.log("✅ License status detected (table format):", licenseStatus);
+                    break;
                   }
                 }
               }
