@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
-import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf";
+import * as pdfjsLib from "pdfjs-dist";
 import Tesseract from "tesseract.js";
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@2.16.105/legacy/build/pdf.worker.min.js`;
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@5.4.54/build/pdf.worker.min.js`;
 
 export default function MVRApprovalForm() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
