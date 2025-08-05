@@ -45,12 +45,16 @@ export default function MVRApprovalForm() {
             let licenseStatus = null;
             let licenseStatusExplanation = null;
             
-            // Debug: Log first 20 lines to console to help troubleshoot
-            console.log("PDF Text Lines (first 20):", lines.slice(0, 20));
+            // Debug: Log first 30 lines to console to help troubleshoot
+            console.log("PDF Text Lines (first 30):", lines.slice(0, 30));
+            console.log("Full PDF text sample:", text.substring(0, 1000));
             
             for (let i = 0; i < lines.length; i++) {
               const line = lines[i].trim();
               const lowerLine = line.toLowerCase();
+              
+              // Enhanced name detection with more patterns
+              console.log(`Line ${i}: "${line}"`);
               
               // Format 1: "Name Searched" on one line, name on next line
               if (lowerLine === 'name searched' && i + 1 < lines.length) {
@@ -61,7 +65,37 @@ export default function MVRApprovalForm() {
                 }
               }
               
-              // Format 2: "Driver Name:" pattern with name between "Driver Name:" and "DOB:"
+              // Format 2: Look for any line that just contains a person's name (early in document)
+              if (!detectedName && i < 50) { // Check first 50 lines
+                // Match patterns like "JOHN DOE", "JANE SMITH JONES", etc.
+                const namePattern = /^([A-Z][A-Z]+\s+[A-Z][A-Z]+(?:\s+[A-Z][A-Z]+)?)$/;
+                const nameMatch = line.match(namePattern);
+                
+                if (nameMatch && nameMatch[1]) {
+                  const potentialName = nameMatch[1];
+                  const words = potentialName.split(' ');
+                  
+                  // Ensure it's 2-4 words, all caps (typical MVR format)
+                  if (words.length >= 2 && words.length <= 4 && 
+                      words.every(word => word.length >= 2) &&
+                      !lowerLine.includes('california') && 
+                      !lowerLine.includes('texas') && 
+                      !lowerLine.includes('arizona') &&
+                      !lowerLine.includes('department') &&
+                      !lowerLine.includes('motor') &&
+                      !lowerLine.includes('vehicle') &&
+                      !lowerLine.includes('record') &&
+                      !lowerLine.includes('license') &&
+                      !lowerLine.includes('state') &&
+                      !lowerLine.includes('report') &&
+                      !lowerLine.includes('driving')) {
+                    detectedName = potentialName;
+                    console.log("Name detected via all-caps pattern:", detectedName);
+                  }
+                }
+              }
+              
+              // Format 3: "Driver Name:" pattern with name between "Driver Name:" and "DOB:"
               if (lowerLine.includes('driver name:') || lowerLine.includes('name:')) {
                 console.log("Found name line:", line);
                 
@@ -109,7 +143,77 @@ export default function MVRApprovalForm() {
                 }
               }
               
-              // Format 3: Look for any line that contains both "name" and what looks like a person's name
+              // Format 4: Look for mixed case names in early lines
+              if (!detectedName && i < 30) {
+                const mixedCasePattern = /^([A-Z][a-z]+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)$/;
+                const mixedMatch = line.match(mixedCasePattern);
+                
+                if (mixedMatch && mixedMatch[1]) {
+                  const potentialName = mixedMatch[1];
+                  const words = potentialName.split(' ');
+                  
+                  if (words.length >= 2 && words.length <= 4 && 
+                      words.every(word => word.length >= 2) &&
+                      !lowerLine.includes('california') && 
+                      !lowerLine.includes('texas') && 
+                      !lowerLine.includes('arizona') &&
+                      !lowerLine.includes('department') &&
+                      !lowerLine.includes('motor') &&
+                      !lowerLine.includes('vehicle') &&
+                      !lowerLine.includes('license') &&
+                      !lowerLine.includes('state') &&
+                      !lowerLine.includes('report')) {
+                    detectedName = potentialName;
+                    console.log("Name detected via mixed case pattern:", detectedName);
+                  }
+                }
+              }
+              
+              // Format 5: Look for "LAST, FIRST" format
+              if (!detectedName && i < 30) {
+                const lastFirstPattern = /^([A-Z]+,\s*[A-Z]+(?:\s+[A-Z]+)?)$/;
+                const lastFirstMatch = line.match(lastFirstPattern);
+                
+                if (lastFirstMatch && lastFirstMatch[1]) {
+                  let nameText = lastFirstMatch[1].replace(',', '').trim();
+                  const words = nameText.split(' ');
+                  
+                  if (words.length >= 2 && words.length <= 4) {
+                    // Rearrange from "LAST FIRST" to "FIRST LAST"
+                    const rearranged = words.slice(1).join(' ') + ' ' + words[0];
+                    detectedName = rearranged;
+                    console.log("Name detected via LAST, FIRST pattern:", detectedName);
+                  }
+                }
+              }
+              
+              // Format 6: Search within lines for embedded names
+              if (!detectedName && i < 20) {
+                // Look for name patterns embedded in lines
+                const embeddedPattern = /\b([A-Z][A-Z]+\s+[A-Z][A-Z]+(?:\s+[A-Z][A-Z]+)?)\b/;
+                const embeddedMatch = line.match(embeddedPattern);
+                
+                if (embeddedMatch && embeddedMatch[1]) {
+                  const potentialName = embeddedMatch[1];
+                  const words = potentialName.split(' ');
+                  
+                  if (words.length >= 2 && words.length <= 4 && 
+                      words.every(word => word.length >= 2 && word.length <= 15) &&
+                      !potentialName.includes('CALIFORNIA') && 
+                      !potentialName.includes('DEPARTMENT') &&
+                      !potentialName.includes('MOTOR') &&
+                      !potentialName.includes('VEHICLE') &&
+                      !potentialName.includes('LICENSE') &&
+                      !potentialName.includes('RECORD') &&
+                      !potentialName.includes('REPORT') &&
+                      !potentialName.includes('STATE')) {
+                    detectedName = potentialName;
+                    console.log("Name detected via embedded pattern:", detectedName);
+                  }
+                }
+              }
+              
+              // Format 7: Look for any line that contains both "name" and what looks like a person's name
               if (!detectedName && lowerLine.includes('name') && !lowerLine.includes('driver name:') && !lowerLine.includes('name searched')) {
                 const possibleNameMatch = line.match(/([A-Z][a-z]+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/);
                 if (possibleNameMatch && possibleNameMatch[1]) {
@@ -240,8 +344,8 @@ export default function MVRApprovalForm() {
                 }
               }
               
-              // Format 4: Direct name pattern detection (fallback) - more aggressive
-              if (!detectedName) {
+              // Format 8: Direct name pattern detection (fallback) - more aggressive
+              if (!detectedName && i < 30) {
                 // Look for any line that looks like a name (2-4 capitalized words)
                 const directNameMatch = line.match(/^([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})$/);
                 if (directNameMatch && directNameMatch[1] && 
@@ -268,8 +372,8 @@ export default function MVRApprovalForm() {
                 }
               }
               
-              // Format 5: Very broad search for name patterns anywhere in the text
-              if (!detectedName && i < 30) { // Only check first 30 lines for performance
+              // Format 9: Very broad search for name patterns anywhere in the text (first 15 lines only)
+              if (!detectedName && i < 15) {
                 const broadNameMatch = line.match(/([A-Z][a-z]{2,}\s+[A-Z][a-z]{2,}(?:\s+[A-Z][a-z]{2,})?)/);
                 if (broadNameMatch && broadNameMatch[1]) {
                   let nameText = broadNameMatch[1].trim();
@@ -284,6 +388,7 @@ export default function MVRApprovalForm() {
                       !lowerLine.includes('record') &&
                       !lowerLine.includes('report') &&
                       !lowerLine.includes('license') &&
+                      !lowerLine.includes('state') &&
                       nameText.split(' ').length >= 2 && 
                       nameText.split(' ').length <= 4) {
                     detectedName = nameText;
