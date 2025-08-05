@@ -73,19 +73,45 @@ export default function MVRApprovalForm() {
                 }
               }
               
-              // License Status Detection
+              // License Status Detection - handle various formats
               if (lowerLine.includes('status:') || lowerLine.startsWith('status:')) {
+                // First try to get status from same line
                 const statusMatch = line.match(/status:\s*([A-Z]+)/i);
                 if (statusMatch && statusMatch[1]) {
                   licenseStatus = statusMatch[1].toUpperCase();
                 }
+                // If status is on next line (like "Status: SUSPENDED")
+                else if (i + 1 < lines.length) {
+                  const nextLine = lines[i + 1].trim();
+                  if (nextLine && /^[A-Z]+$/.test(nextLine)) {
+                    licenseStatus = nextLine.toUpperCase();
+                  }
+                }
               }
               
-              // License Status Explanation Detection
+              // Also check for standalone status lines after "Status:" appears
+              if (licenseStatus === null && /^(VALID|ACTIVE|SUSPENDED|REVOKED|CANCELLED|EXPIRED)$/i.test(line)) {
+                // Look back a few lines to see if this follows a "Status:" line
+                for (let j = Math.max(0, i - 3); j < i; j++) {
+                  if (lines[j].toLowerCase().includes('status:')) {
+                    licenseStatus = line.toUpperCase();
+                    break;
+                  }
+                }
+              }
+              
+              // License Status Explanation Detection - handle various formats
               if (lowerLine.includes('license status explanation:') || lowerLine.includes('status explanation:')) {
                 const explanationMatch = line.match(/(?:license\s+)?status\s+explanation:\s*(.+)/i);
                 if (explanationMatch && explanationMatch[1]) {
                   licenseStatusExplanation = explanationMatch[1].trim();
+                }
+                // If explanation is on next line
+                else if (i + 1 < lines.length) {
+                  const nextLine = lines[i + 1].trim();
+                  if (nextLine && nextLine.length > 2) {
+                    licenseStatusExplanation = nextLine;
+                  }
                 }
               }
               
