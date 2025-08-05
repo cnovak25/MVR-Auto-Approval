@@ -53,15 +53,44 @@ export default function MVRApprovalForm() {
               const line = lines[i].trim();
               const lowerLine = line.toLowerCase();
               
-              // Enhanced name detection with more patterns
-              console.log(`Line ${i}: "${line}"`);
+              // Skip empty lines
+              if (!line) continue;
               
-              // Format 1: "Name Searched" on one line, name on next line
-              if (lowerLine === 'name searched' && i + 1 < lines.length) {
-                const nextLine = lines[i + 1].trim();
-                if (nextLine && nextLine.length > 2) {
-                  detectedName = nextLine;
-                  console.log("Name detected via 'Name Searched':", detectedName);
+              // Enhanced name detection with more patterns
+              // Only log when we find potential names, not every line
+              
+              // Format 1: "Name Searched" on one line, name on next line OR embedded in same line
+              if (lowerLine.includes('name searched')) {
+                console.log("Found 'Name Searched' pattern");
+                
+                // Check if name is on the same line after "Name Searched"
+                const sameLineMatch = line.match(/name searched\s+(.+?)(?:\s{2,}|$)/i);
+                if (sameLineMatch && sameLineMatch[1]) {
+                  let nameText = sameLineMatch[1].trim();
+                  
+                  // Clean up and validate
+                  const words = nameText.split(/\s+/);
+                  if (words.length >= 2 && words.length <= 4 && 
+                      words.every(word => word.length >= 1 && word.length <= 20)) {
+                    detectedName = nameText;
+                    console.log("✓ Name detected via 'Name Searched' (same line):", detectedName);
+                    break;
+                  }
+                }
+                
+                // Check next line if same line didn't work
+                if (!detectedName && i + 1 < lines.length) {
+                  const nextLine = lines[i + 1].trim();
+                  if (nextLine && nextLine.length > 2) {
+                    // Extract just the name part from next line
+                    const words = nextLine.split(/\s+/);
+                    if (words.length >= 2 && words.length <= 4) {
+                      const potentialName = words.slice(0, 4).join(' '); // Take first 4 words max
+                      detectedName = potentialName;
+                      console.log("✓ Name detected via 'Name Searched' (next line):", detectedName);
+                      break;
+                    }
+                  }
                 }
               }
               
@@ -90,32 +119,54 @@ export default function MVRApprovalForm() {
                       !lowerLine.includes('report') &&
                       !lowerLine.includes('driving')) {
                     detectedName = potentialName;
-                    console.log("Name detected via all-caps pattern:", detectedName);
+                    console.log("✓ Name detected via all-caps pattern:", detectedName);
+                    break;
                   }
                 }
               }
               
               // Format 3: "Driver Name:" pattern with name between "Driver Name:" and "DOB:"
-              if (lowerLine.includes('driver name:') || lowerLine.includes('name:')) {
-                console.log("Found name line:", line);
+              if (!detectedName && (lowerLine.includes('driver name:') || lowerLine.includes('name:'))) {
+                console.log("Found name line:", line.substring(0, 100) + "...");
                 
                 // Extract everything after "Driver Name:" or "Name:" and before "DOB:"
                 const nameMatch = line.match(/(?:driver\s+)?name:\s*(.+)/i);
                 if (nameMatch && nameMatch[1]) {
                   let nameText = nameMatch[1].trim();
                   
-                  // If there's more text on the same line, check if DOB is there
-                  const dobIndex = nameText.toLowerCase().indexOf('dob:');
-                  if (dobIndex !== -1) {
-                    nameText = nameText.substring(0, dobIndex).trim();
+                  // Stop at common delimiters that indicate end of name
+                  const stopPatterns = [
+                    'reference:', 'dob:', 'address:', 'license:', 'phone:', 'email:',
+                    'search id', 'date ordered', 'date completed', 'results',
+                    'motor vehicle', 'california', 'texas', 'arizona',
+                    '*', 'document(s)', 'the following', 'search type'
+                  ];
+                  
+                  for (const pattern of stopPatterns) {
+                    const index = nameText.toLowerCase().indexOf(pattern);
+                    if (index !== -1) {
+                      nameText = nameText.substring(0, index).trim();
+                      break;
+                    }
+                  }
+                  
+                  // Also split on multiple spaces (often indicates new section)
+                  const parts = nameText.split(/\s{2,}/);
+                  if (parts.length > 1) {
+                    nameText = parts[0].trim();
                   }
                   
                   // Clean up the name - remove any trailing non-letter characters
                   nameText = nameText.replace(/[^a-zA-Z\s]+$/, '').trim();
                   
-                  if (nameText && nameText.length > 2) {
+                  // Validate it looks like a reasonable name (2-4 words, not too long)
+                  const words = nameText.split(/\s+/);
+                  if (nameText && nameText.length >= 3 && nameText.length <= 50 && 
+                      words.length >= 2 && words.length <= 4 &&
+                      words.every(word => word.length >= 1 && word.length <= 20)) {
                     detectedName = nameText;
-                    console.log("Name detected via 'Name:':", detectedName);
+                    console.log("✓ Name detected via 'Name:' (cleaned):", detectedName);
+                    break;
                   }
                 }
                 // If name might be on next line after "Driver Name:" or "Name:"
@@ -137,7 +188,8 @@ export default function MVRApprovalForm() {
                     
                     if (nameText && (/^[A-Z][a-z]+\s+[A-Z]/.test(nameText) || nameText.split(' ').length >= 2)) {
                       detectedName = nameText;
-                      console.log("Name detected on next line:", detectedName);
+                      console.log("✓ Name detected on next line:", detectedName);
+                      break;
                     }
                   }
                 }
@@ -164,7 +216,8 @@ export default function MVRApprovalForm() {
                       !lowerLine.includes('state') &&
                       !lowerLine.includes('report')) {
                     detectedName = potentialName;
-                    console.log("Name detected via mixed case pattern:", detectedName);
+                    console.log("✓ Name detected via mixed case pattern:", detectedName);
+                    break;
                   }
                 }
               }
@@ -182,7 +235,8 @@ export default function MVRApprovalForm() {
                     // Rearrange from "LAST FIRST" to "FIRST LAST"
                     const rearranged = words.slice(1).join(' ') + ' ' + words[0];
                     detectedName = rearranged;
-                    console.log("Name detected via LAST, FIRST pattern:", detectedName);
+                    console.log("✓ Name detected via LAST, FIRST pattern:", detectedName);
+                    break;
                   }
                 }
               }
@@ -208,7 +262,8 @@ export default function MVRApprovalForm() {
                       !potentialName.includes('REPORT') &&
                       !potentialName.includes('STATE')) {
                     detectedName = potentialName;
-                    console.log("Name detected via embedded pattern:", detectedName);
+                    console.log("✓ Name detected via embedded pattern:", detectedName);
+                    break;
                   }
                 }
               }
@@ -398,11 +453,15 @@ export default function MVRApprovalForm() {
               }
             }
             
+            // Final verification and logging
             if (detectedName) {
+              // Clean up the detected name
+              detectedName = detectedName.trim();
               setDriverName(detectedName);
-              console.log("Final detected name set:", detectedName);
+              console.log("🎯 FINAL: Name successfully detected and set:", detectedName);
             } else {
-              console.log("No name detected - this needs investigation");
+              console.log("❌ FINAL: No name detected after all attempts");
+              console.log("📋 First 10 lines for manual review:", lines.slice(0, 10));
             }
             
             // Store license status in the text for later evaluation
