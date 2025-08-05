@@ -501,6 +501,11 @@ export default function MVRApprovalForm() {
               }
             }
             
+            // Add detected name to text for evaluation
+            if (detectedName) {
+              text += `\n__DETECTED_NAME__: ${detectedName}`;
+            }
+            
             resolve(text);
           } catch (pdfError) {
             reject(pdfError);
@@ -641,10 +646,23 @@ export default function MVRApprovalForm() {
     return { violations, accidents };
   };
 
-  const evaluateMVR = (text) => {
+  const evaluateMVR = (text, currentDriverName = null) => {
     const dobMatch = dob.match(/(\d{4})-(\d{2})-(\d{2})/);
     const birthYear = dobMatch ? parseInt(dobMatch[1], 10) : null;
     const age = birthYear ? new Date().getFullYear() - birthYear : null;
+
+    // Extract detected name from text if available
+    const detectedNameMatch = text.match(/__DETECTED_NAME__:\s*(.+)/);
+    const detectedNameFromText = detectedNameMatch ? detectedNameMatch[1].trim() : null;
+    
+    // Use the most current driver name in this priority order:
+    // 1. Current driver name (from manual field if filled)
+    // 2. Detected name from PDF parsing
+    // 3. Empty string
+    let evaluationDriverName = currentDriverName || driverName;
+    if (!evaluationDriverName.trim() && detectedNameFromText) {
+      evaluationDriverName = detectedNameFromText;
+    }
 
     // Extract license status information
     const licenseStatusMatch = text.match(/__LICENSE_STATUS__:\s*([A-Z]+)/);
@@ -761,7 +779,7 @@ export default function MVRApprovalForm() {
 
     const evaluation = {
       timestamp: new Date().toISOString(),
-      driverName,
+      driverName: evaluationDriverName,
       age,
       driverType,
       classification,
