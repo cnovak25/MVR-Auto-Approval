@@ -285,7 +285,8 @@ export default function MVRApprovalForm() {
                   // Validate it's actually a name
                   if (nameText && nameText.split(' ').length >= 2 && nameText.split(' ').length <= 4) {
                     detectedName = nameText;
-                    console.log("Name detected via general name pattern:", detectedName);
+                    console.log("✓ Name detected via general name pattern:", detectedName);
+                    break;
                   }
                 }
               }
@@ -422,7 +423,8 @@ export default function MVRApprovalForm() {
                   const words = nameText.split(' ');
                   if (words.length >= 2 && words.length <= 4) {
                     detectedName = nameText;
-                    console.log("Name detected via fallback pattern:", detectedName);
+                    console.log("✓ Name detected via fallback pattern:", detectedName);
+                    break;
                   }
                 }
               }
@@ -447,21 +449,25 @@ export default function MVRApprovalForm() {
                       nameText.split(' ').length >= 2 && 
                       nameText.split(' ').length <= 4) {
                     detectedName = nameText;
-                    console.log("Name detected via broad search:", detectedName);
+                    console.log("✓ Name detected via broad search:", detectedName);
+                    break;
                   }
                 }
               }
             }
             
             // Final verification and logging
+            console.log("🔍 BEFORE FINAL CHECK - detectedName:", detectedName);
+            
             if (detectedName) {
               // Clean up the detected name
               detectedName = detectedName.trim();
-              setDriverName(detectedName);
               console.log("🎯 FINAL: Name successfully detected and set:", detectedName);
+              setDriverName(detectedName);
             } else {
               console.log("❌ FINAL: No name detected after all attempts");
               console.log("📋 First 10 lines for manual review:", lines.slice(0, 10));
+              setDriverName(""); // Ensure it's cleared
             }
             
             // Store license status in the text for later evaluation
