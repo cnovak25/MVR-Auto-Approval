@@ -1,5 +1,6 @@
 {
   "version": 2,
+  "name": "mvr-auto-approval",
   "builds": [
     {
       "src": "package.json",
@@ -18,5 +19,7 @@
       "src": "/(.*)",
       "dest": "/index.html"
     }
-  ]
+  ],
+  "functions": {},
+  "trailingSlash": false
 }
