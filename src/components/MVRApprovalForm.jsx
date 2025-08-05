@@ -19,6 +19,7 @@ export default function MVRApprovalForm() {
       setIsAuthenticated(true);
     } else {
       alert("Incorrect password");
+      }
     }
   };
 
@@ -171,4 +172,3 @@ export default function MVRApprovalForm() {
       </div>
     );
   }
-
