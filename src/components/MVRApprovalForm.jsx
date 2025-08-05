@@ -289,7 +289,25 @@ export default function MVRApprovalForm() {
 
     // Extract license status information
     const licenseStatusMatch = text.match(/__LICENSE_STATUS__:\s*([A-Z]+)/);
-    const licenseStatus = licenseStatusMatch ? licenseStatusMatch[1] : null;
+    const rawLicenseStatus = licenseStatusMatch ? licenseStatusMatch[1] : null;
+    
+    // Normalize license status to simple terms
+    let licenseStatus = "Not specified";
+    if (rawLicenseStatus) {
+      if (rawLicenseStatus === 'ACTIVE' || rawLicenseStatus === 'VALID') {
+        licenseStatus = "Valid";
+      } else if (rawLicenseStatus === 'SUSPENDED') {
+        licenseStatus = "Suspended";
+      } else if (rawLicenseStatus === 'REVOKED') {
+        licenseStatus = "Revoked";
+      } else if (rawLicenseStatus === 'CANCELLED') {
+        licenseStatus = "Cancelled";
+      } else if (rawLicenseStatus === 'EXPIRED') {
+        licenseStatus = "Expired";
+      } else {
+        licenseStatus = rawLicenseStatus;
+      }
+    }
     
     const licenseStatusExplanationMatch = text.match(/__LICENSE_STATUS_EXPLANATION__:\s*(.+)/);
     const licenseStatusExplanation = licenseStatusExplanationMatch ? licenseStatusExplanationMatch[1] : null;
@@ -330,7 +348,7 @@ export default function MVRApprovalForm() {
     let disqualificationReasons = [];
 
     // Check license status - suspended/revoked license is automatic disqualification
-    if (licenseStatus && (licenseStatus === 'SUSPENDED' || licenseStatus === 'REVOKED' || licenseStatus === 'CANCELLED')) {
+    if (licenseStatus && (licenseStatus === 'Suspended' || licenseStatus === 'Revoked' || licenseStatus === 'Cancelled')) {
       disqualificationReasons.push(`License Status: ${licenseStatus}${licenseStatusExplanation ? ` (${licenseStatusExplanation})` : ''}`);
     }
 
@@ -582,9 +600,9 @@ export default function MVRApprovalForm() {
             <div className="bg-gray-50 p-4 rounded-lg">
               <strong className="text-gray-700">License Status:</strong> 
               <div className={`font-medium ${
-                result.licenseStatus === 'SUSPENDED' || result.licenseStatus === 'REVOKED' || result.licenseStatus === 'CANCELLED'
+                result.licenseStatus === 'Suspended' || result.licenseStatus === 'Revoked' || result.licenseStatus === 'Cancelled'
                   ? 'text-red-600' 
-                  : result.licenseStatus === 'VALID' || result.licenseStatus === 'ACTIVE'
+                  : result.licenseStatus === 'Valid'
                   ? 'text-green-600'
                   : 'text-gray-900'
               }`}>
