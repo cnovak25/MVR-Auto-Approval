@@ -2,7 +2,11 @@ import React, { useState } from "react";
 import * as pdfjsLib from "pdfjs-dist";
 import Tesseract from "tesseract.js";
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@5.4.54/build/pdf.worker.min.js`;
+// Configure PDF.js worker
+// Try using a more reliable CDN
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/5.4.54/pdf.worker.min.js`;
+
+console.log("PDF.js worker configured:", pdfjsLib.GlobalWorkerOptions.workerSrc);
 
 export default function MVRApprovalForm() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -23,25 +27,38 @@ export default function MVRApprovalForm() {
   };
 
   const readTextFromPDF = async (file) => {
+    console.log("Starting PDF reading for file:", file.name);
     try {
       const reader = new FileReader();
       return new Promise((resolve, reject) => {
         reader.onload = async () => {
-          const typedarray = new Uint8Array(reader.result);
-          const pdf = await pdfjsLib.getDocument({ data: typedarray }).promise;
-          let text = "";
-          for (let i = 1; i <= pdf.numPages; i++) {
-            const page = await pdf.getPage(i);
-            const content = await page.getTextContent();
-            text += content.items.map((s) => s.str).join(" ") + "\n";
+          console.log("FileReader loaded, processing PDF...");
+          try {
+            const typedarray = new Uint8Array(reader.result);
+            const pdf = await pdfjsLib.getDocument({ data: typedarray }).promise;
+            console.log("PDF loaded, page count:", pdf.numPages);
+            let text = "";
+            for (let i = 1; i <= pdf.numPages; i++) {
+              const page = await pdf.getPage(i);
+              const content = await page.getTextContent();
+              text += content.items.map((s) => s.str).join(" ") + "\n";
+            }
+            console.log("Text extraction complete, length:", text.length);
+            const nameMatch = text.match(/Name\s*[:\-]?\s*([A-Z][a-z]+\s+[A-Z][a-z]+)/i);
+            if (nameMatch && nameMatch[1]) {
+              console.log("Name detected:", nameMatch[1]);
+              setDriverName(nameMatch[1]);
+            }
+            resolve(text);
+          } catch (pdfError) {
+            console.error("PDF processing error:", pdfError);
+            reject(pdfError);
           }
-          const nameMatch = text.match(/Name\s*[:\-]?\s*([A-Z][a-z]+\s+[A-Z][a-z]+)/i);
-          if (nameMatch && nameMatch[1]) {
-            setDriverName(nameMatch[1]);
-          }
-          resolve(text);
         };
-        reader.onerror = reject;
+        reader.onerror = (error) => {
+          console.error("FileReader error:", error);
+          reject(error);
+        };
         reader.readAsArrayBuffer(file);
       });
     } catch (err) {
@@ -188,10 +205,27 @@ export default function MVRApprovalForm() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!mvrFile) return;
-    const text = await readTextFromPDF(mvrFile);
-    const evaluation = evaluateMVR(text);
-    setResult(evaluation);
+    console.log("Form submitted!");
+    console.log("MVR File:", mvrFile);
+    console.log("DOB:", dob);
+    
+    if (!mvrFile) {
+      console.log("No MVR file selected");
+      alert("Please select an MVR file");
+      return;
+    }
+    
+    console.log("Starting PDF processing...");
+    try {
+      const text = await readTextFromPDF(mvrFile);
+      console.log("PDF text extracted:", text.substring(0, 200) + "...");
+      const evaluation = evaluateMVR(text);
+      console.log("Evaluation result:", evaluation);
+      setResult(evaluation);
+    } catch (error) {
+      console.error("Error processing PDF:", error);
+      alert("Error processing PDF: " + error.message);
+    }
   };
 
   if (!isAuthenticated) {
@@ -228,6 +262,31 @@ export default function MVRApprovalForm() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        <div>
+          <button
+            type="button"
+            onClick={() => {
+              console.log("Test button clicked");
+              alert("Test button works!");
+            }}
+            className="bg-purple-600 text-white px-4 py-2 rounded mb-4"
+          >
+            Test Button (Debug)
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              console.log("Testing evaluation without PDF");
+              const testText = "Name: John Doe\nViolations: None To Report\nAccidents: None To Report";
+              const evaluation = evaluateMVR(testText);
+              setResult(evaluation);
+            }}
+            className="bg-orange-600 text-white px-4 py-2 rounded mb-4 ml-2"
+          >
+            Test Evaluation (No PDF)
+          </button>
+        </div>
+        
         <div>
           <label className="block text-sm font-medium mb-2">Driver Type</label>
           <select

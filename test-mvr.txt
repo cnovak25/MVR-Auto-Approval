@@ -1,0 +1,11 @@
+Name: John Doe
+Date of Birth: 01/15/1990
+License Number: D123456789
+
+VIOLATIONS
+None To Report
+
+ACCIDENTS  
+None To Report
+
+This driver has a clean record with no violations or accidents.
