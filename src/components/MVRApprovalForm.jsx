@@ -343,175 +343,56 @@ export default function MVRApprovalForm() {
 
   if (!isAuthenticated) {
     return (
-      <div className="max-w-md mx-auto mt-20 p-6 border rounded shadow">
-        <h2 className="text-xl font-bold mb-4">Restricted Access</h2>
-        <input
-          type="password"
-          placeholder="Enter password"
-          value={passwordInput}
-          onChange={(e) => setPasswordInput(e.target.value)}
-          className="w-full px-3 py-2 border rounded mb-4"
-        />
-        <button
-          onClick={login}
-          className="bg-blue-600 text-white px-4 py-2 rounded w-full"
-        >
-          Login
-        </button>
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="max-w-md w-full mx-auto p-8 bg-white border-2 border-red-900 rounded-lg shadow-lg">
+          <h2 className="text-2xl font-bold mb-6 text-red-900 text-center">Restricted Access</h2>
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-2 text-gray-700">Password</label>
+            <input
+              type="password"
+              placeholder="Enter password"
+              value={passwordInput}
+              onChange={(e) => setPasswordInput(e.target.value)}
+              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-red-900 focus:outline-none transition-colors"
+            />
+          </div>
+          <button
+            onClick={login}
+            className="bg-red-900 hover:bg-red-800 text-white px-6 py-3 rounded-lg w-full font-medium transition-colors"
+          >
+            Login
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-4">MVR Auto-Approval System</h1>
-        <button
-          onClick={exportCSV}
-          className="bg-green-600 text-white px-4 py-2 rounded mb-4"
-        >
-          Export Evaluation Logs (CSV)
-        </button>
-      </div>
+    <div className="min-h-screen bg-gray-100">
+      <div className="max-w-4xl mx-auto p-6">
+        <div className="bg-white border-2 border-red-900 rounded-lg shadow-lg p-8 mb-6">
+          <h1 className="text-4xl font-bold mb-2 text-red-900 text-center">MVR Auto-Approval System</h1>
+          <p className="text-gray-600 text-center mb-6">Moon Valley Nursery Driver Standards Evaluation</p>
+          <div className="flex justify-center">
+            <button
+              onClick={exportCSV}
+              className="bg-red-900 hover:bg-red-800 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+            >
+              Export Evaluation Logs (CSV)
+            </button>
+          </div>
+        </div>
+
+        <div className="bg-white border-2 border-red-900 rounded-lg shadow-lg p-8">
+          <h2 className="text-2xl font-semibold mb-6 text-red-900">Driver Evaluation Form</h2>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
-          <button
-            type="button"
-            onClick={() => {
-              const sampleMVR = `Profile Information
-Name:  	Edgar Navarro
-Reference:	 N. Hollywood
-* Document(s) Attached
- 	 	 	 
- 
-The following are included in this report:
-Search Type   	Detail   	Status   
-Motor Vehicle Records Search   	California (license F7895107)    	Complete
- 
-Motor Vehicle Records Search
-State	 	California
-License	 	F7895107
-Name Searched	 	Edgar Navarro
-Search ID	 	2371838
-Reference	 	N. Hollywood
-Date Ordered	 	07/31/2025
-Date Completed	 	07/31/2025
-Results
-CALIFORNIADriver Record - D2523	Order Date: 07/31/2025	Seq #: 0
-Host Used:	Online	Bill Code:	
-Rec Type:	STANDARD	Reference:	
-License:	F7895107
-Name:	NAVARROCARBAJAL, EDGAR ULISES
-Address:	
-City, St:	
-Sex:	MALE	Weight:	150lbs.	DOB:	10/18/1996		
-Eyes:	BROWN	Height:	5'08"	Iss Date:	10/20/2023		
-Hair:	BROWN			Exp Date:	10/18/2028		
-Approx. Year Lic. First Issued: 2013	STATUS:SEE BELOW
-MVR Score: 1 STANDARD
-Violations/ConvictionsFailures To Appear Accidents
-TYPE	VIOL	CONV	ACD	AVD	V/C	DESCRIPTION	C	LOCATION	TICKET	PLATE	AT FAULT	PT
-ABS	08/21/2023	09/20/2023	B50	DC06	4000A1	UNREGISTERED VEHICLE-ON/OFF HWY	N	SAN BENITO	2303291	8TRL681		0	
-ABS	07/07/2024	10/16/2024	A08	CB03	23152B	DRIVING WITH BAC OF .08 OR MORE	N	SALINAS	R005603	8PNK628		2	
--	UE08	23593A	ADDITIONAL COURT-IMPOSED ORDERS	N						
-Suspensions/Revocations
-ACTIONS	ORD/DATE	EFF/DATE	CLEAR/DATE	END/DATE	CODE	AVD	DESCRIPTION	NEW SUSP
-SUSPENSION	12/24/2024	01/02/2025		02/19/2025	96A	CA02	IMMEDIATE SUSP-EXCESSIVE BLOOD ALCH`;
-              
-              console.log("Testing Edgar's MVR (2 violations, DUI) - MVN Policy");
-              setDob("1996-10-18"); // Edgar is 28 years old (meets Essential age requirement)
-              const evaluation = evaluateMVR(sampleMVR);
-              setResult(evaluation);
-              setDriverName("Edgar Navarro");
-            }}
-            className="bg-purple-600 text-white px-4 py-2 rounded mb-4"
-          >
-            Test Edgar (2 Violations + DUI)
-          </button>
-          
-          <button
-            type="button"
-            onClick={() => {
-              const cleanMVR = `Name:  	William Allen Hibbens
-DOB:  	08/25/****
- 	 	 	 
- 
-The following are included in this report:
-Search Type   	Detail   	Status   
-Motor Vehicle Records Search   	Texas (license 52270616)    	Complete
- 
-Motor Vehicle Records Search
-State	 	Texas
-License	 	52270616
-Name Searched	 	William Allen Hibbens
-DOB Searched	 	08/25/****
-Search ID	 	2369990
-Date Ordered	 	07/28/2025
-Date Completed	 	07/28/2025
-Results
-TEXASDriver Record - D2523	Order Date: 07/28/2025	Seq #: 0
-Host Used:	Online	Bill Code:	
-Rec Type:	STANDARD	Reference:	
-License:	52270616
-Name:	HIBBENS, WILLIAM ALLEN
-Address:	10034 COMANCHE LN
-City, St:	HOUSTON, TX 77041
-Sex:		Weight:		DOB:	08/25/****		
-Eyes:		Height:		Iss Date:			
-Hair:				Exp Date:	08/25/2033		
-Year License First Issued: 06/05/2025	STATUS:VALID
-MVR Score: 1 STANDARD
-Violations/ConvictionsFailures To Appear Accidents
-*** NONE TO REPORT ***
-Suspensions/Revocations
-*** NO ACTIVITY ***
-License and Permit Information
-License: PERSONAL	Issue:	Expire: 08/25/2033	Status: VALID		
-Class: C	SINGLE VEH < 26K`;
-              
-              console.log("Testing William's clean MVR (0 violations) - MVN Policy");
-              setDob("1985-08-25"); // William is 40 years old (meets all requirements)
-              const evaluation = evaluateMVR(cleanMVR);
-              setResult(evaluation);
-              setDriverName("William Allen Hibbens");
-            }}
-            className="bg-green-600 text-white px-4 py-2 rounded mb-4 ml-2"
-          >
-            Test William (TX Clean)
-          </button>
-          
-          <button
-            type="button"
-            onClick={() => {
-              const youngDriverMVR = `Name: Sarah Young Driver
-State: California
-License: D987654321
-DOB: 03/15/2004
-Violations/ConvictionsFailures To Appear Accidents
-*** NONE TO REPORT ***
-License and Permit Information
-License: PERSONAL	Issue: 03/15/2022	Expire: 03/15/2030	Status: VALID		
-Class: C	SINGLE VEH < 26K`;
-              
-              console.log("Testing Young Driver (21 years old) - MVN Policy Age Test");
-              setDob("2004-03-15"); // Sarah is 21 years old
-              const evaluation = evaluateMVR(youngDriverMVR);
-              setResult(evaluation);
-              setDriverName("Sarah Young Driver");
-            }}
-            className="bg-orange-600 text-white px-4 py-2 rounded mb-4 ml-2"
-          >
-            Test Young Driver (Age 21)
-          </button>
-        </div>
-        
-        <div>
-          <label className="block text-sm font-medium mb-2">Driver Type</label>
+          <label className="block text-sm font-medium mb-2 text-gray-700">Driver Type</label>
           <select
             value={driverType}
             onChange={(e) => setDriverType(e.target.value)}
-            className="w-full px-3 py-2 border rounded"
+            className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-red-900 focus:outline-none transition-colors"
           >
             <option value="essential">Essential Driver</option>
             <option value="non-essential">Non-Essential Driver</option>
@@ -519,97 +400,105 @@ Class: C	SINGLE VEH < 26K`;
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-2">Date of Birth</label>
+          <label className="block text-sm font-medium mb-2 text-gray-700">Date of Birth</label>
           <input
             type="date"
             value={dob}
             onChange={(e) => setDob(e.target.value)}
-            className="w-full px-3 py-2 border rounded"
+            className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-red-900 focus:outline-none transition-colors"
             required
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-2">MVR Document (PDF)</label>
+          <label className="block text-sm font-medium mb-2 text-gray-700">MVR Document (PDF)</label>
           <input
             type="file"
             accept=".pdf"
             onChange={(e) => setMvrFile(e.target.files[0])}
-            className="w-full px-3 py-2 border rounded"
+            className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-red-900 focus:outline-none transition-colors file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-red-900 file:text-white file:cursor-pointer"
             required
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-2">Insurance Document (PDF) - Optional</label>
+          <label className="block text-sm font-medium mb-2 text-gray-700">Insurance Document (PDF) - Optional</label>
           <input
             type="file"
             accept=".pdf"
             onChange={(e) => setInsuranceFile(e.target.files[0])}
-            className="w-full px-3 py-2 border rounded"
+            className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-red-900 focus:outline-none transition-colors file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-red-900 file:text-white file:cursor-pointer"
           />
         </div>
 
         <button
           type="submit"
-          className="bg-blue-600 text-white px-6 py-3 rounded font-medium"
+          className="bg-red-900 hover:bg-red-800 text-white px-8 py-4 rounded-lg font-medium w-full transition-colors"
         >
           Evaluate Driver
         </button>
       </form>
 
       {result && (
-        <div className="mt-8 p-6 border rounded bg-gray-50">
-          <h2 className="text-2xl font-bold mb-4">Evaluation Result</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <strong>Driver Name:</strong> {result.driverName || "Not detected"}
+        <div className="mt-8 p-8 bg-white border-2 border-red-900 rounded-lg shadow-lg">
+          <h2 className="text-2xl font-bold mb-6 text-red-900">Evaluation Result</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <strong className="text-gray-700">Driver Name:</strong> 
+              <div className="text-gray-900 font-medium">{result.driverName || "Not detected"}</div>
             </div>
-            <div>
-              <strong>Driver Type:</strong> {result.driverType === "essential" ? "Essential Driver" : "Non-Essential Driver"}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <strong className="text-gray-700">Driver Type:</strong> 
+              <div className="text-gray-900 font-medium">{result.driverType === "essential" ? "Essential Driver" : "Non-Essential Driver"}</div>
             </div>
-            <div>
-              <strong>Age:</strong> {result.age || "Unknown"}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <strong className="text-gray-700">Age:</strong> 
+              <div className="text-gray-900 font-medium">{result.age || "Unknown"}</div>
             </div>
-            <div>
-              <strong>Violations:</strong> {result.violations}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <strong className="text-gray-700">Violations:</strong> 
+              <div className="text-gray-900 font-medium">{result.violations}</div>
             </div>
-            <div>
-              <strong>Accidents:</strong> {result.accidents}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <strong className="text-gray-700">Accidents:</strong> 
+              <div className="text-gray-900 font-medium">{result.accidents}</div>
             </div>
-            <div className="md:col-span-2">
-              <strong>Major Convictions:</strong> {result.majorConvictions.length > 0 ? result.majorConvictions.join(", ") : "None"}
+            <div className="bg-gray-50 p-4 rounded-lg md:col-span-2">
+              <strong className="text-gray-700">Major Convictions:</strong> 
+              <div className="text-gray-900 font-medium">{result.majorConvictions.length > 0 ? result.majorConvictions.join(", ") : "None"}</div>
             </div>
             {result.disqualificationReasons && result.disqualificationReasons.length > 0 && (
-              <div className="md:col-span-2">
-                <strong>Disqualification Reasons:</strong> 
-                <div className="ml-2 text-red-600">
+              <div className="md:col-span-2 bg-red-50 border border-red-200 p-4 rounded-lg">
+                <strong className="text-red-800">Disqualification Reasons:</strong> 
+                <div className="ml-2 text-red-700">
                   {result.disqualificationReasons.map((reason, index) => (
                     <div key={index} className="mb-1">• {reason}</div>
                   ))}
                 </div>
               </div>
             )}
-            <div className="md:col-span-2">
-              <strong>Final Verdict:</strong> 
-              <span className={`ml-2 px-3 py-1 rounded font-medium ${
+            <div className="md:col-span-2 text-center">
+              <strong className="text-gray-700 text-lg">Final Verdict:</strong> 
+              <div className={`mt-2 inline-block px-6 py-3 rounded-lg font-bold text-lg ${
                 result.finalVerdict === "Disqualified" 
-                  ? "bg-red-100 text-red-800" 
+                  ? "bg-red-100 text-red-800 border-2 border-red-300" 
                   : result.finalVerdict === "Clear"
-                  ? "bg-green-100 text-green-800"
+                  ? "bg-green-100 text-green-800 border-2 border-green-300"
                   : result.finalVerdict === "Acceptable"
-                  ? "bg-blue-100 text-blue-800"
-                  : "bg-yellow-100 text-yellow-800"
+                  ? "bg-blue-100 text-blue-800 border-2 border-blue-300"
+                  : "bg-yellow-100 text-yellow-800 border-2 border-yellow-300"
               }`}>
                 {result.finalVerdict}
-              </span>
+              </div>
             </div>
-            <div className="md:col-span-2 text-sm text-gray-600 mt-2">
+            <div className="md:col-span-2 text-center text-sm text-gray-600 mt-4 pt-4 border-t border-gray-300">
               <strong>Policy:</strong> {result.policy || "Moon Valley Nursery Driver Standards (June 2025)"}
             </div>
           </div>
         </div>
       )}
+        </div>
+      </div>
     </div>
   );
 }
