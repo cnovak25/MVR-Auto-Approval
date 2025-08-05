@@ -45,6 +45,9 @@ export default function MVRApprovalForm() {
             let licenseStatus = null;
             let licenseStatusExplanation = null;
             
+            // Debug: Log first 20 lines to console to help troubleshoot
+            console.log("PDF Text Lines (first 20):", lines.slice(0, 20));
+            
             for (let i = 0; i < lines.length; i++) {
               const line = lines[i].trim();
               const lowerLine = line.toLowerCase();
@@ -54,15 +57,18 @@ export default function MVRApprovalForm() {
                 const nextLine = lines[i + 1].trim();
                 if (nextLine && nextLine.length > 2) {
                   detectedName = nextLine;
+                  console.log("Name detected via 'Name Searched':", detectedName);
                 }
               }
               
               // Format 2: "Driver Name:" pattern with name between "Driver Name:" and "DOB:"
-              if (lowerLine.includes('driver name:')) {
-                // Extract everything after "Driver Name:" and before "DOB:"
-                const driverNameMatch = line.match(/driver name:\s*(.+)/i);
-                if (driverNameMatch && driverNameMatch[1]) {
-                  let nameText = driverNameMatch[1].trim();
+              if (lowerLine.includes('driver name:') || lowerLine.includes('name:')) {
+                console.log("Found name line:", line);
+                
+                // Extract everything after "Driver Name:" or "Name:" and before "DOB:"
+                const nameMatch = line.match(/(?:driver\s+)?name:\s*(.+)/i);
+                if (nameMatch && nameMatch[1]) {
+                  let nameText = nameMatch[1].trim();
                   
                   // If there's more text on the same line, check if DOB is there
                   const dobIndex = nameText.toLowerCase().indexOf('dob:');
@@ -75,11 +81,14 @@ export default function MVRApprovalForm() {
                   
                   if (nameText && nameText.length > 2) {
                     detectedName = nameText;
+                    console.log("Name detected via 'Name:':", detectedName);
                   }
                 }
-                // If name might be on next line after "Driver Name:"
+                // If name might be on next line after "Driver Name:" or "Name:"
                 else if (i + 1 < lines.length) {
                   const nextLine = lines[i + 1].trim();
+                  console.log("Checking next line for name:", nextLine);
+                  
                   if (nextLine && nextLine.length > 2) {
                     let nameText = nextLine;
                     
@@ -92,44 +101,32 @@ export default function MVRApprovalForm() {
                     // Clean up the name
                     nameText = nameText.replace(/[^a-zA-Z\s]+$/, '').trim();
                     
-                    if (nameText && /^[A-Z][a-z]+\s+[A-Z]/.test(nameText)) {
+                    if (nameText && (/^[A-Z][a-z]+\s+[A-Z]/.test(nameText) || nameText.split(' ').length >= 2)) {
                       detectedName = nameText;
+                      console.log("Name detected on next line:", detectedName);
                     }
                   }
                 }
               }
               
-              // Format 3: "Name:" followed by name on same or next line
-              if (!detectedName && (lowerLine.includes('name:') || lowerLine.includes('name '))) {
-                // Try to extract from same line first
-                const nameMatch = line.match(/name\s*[:\-]?\s*([A-Z][a-z]+\s+[A-Z][a-z]+.*)/i);
-                if (nameMatch && nameMatch[1]) {
-                  let nameText = nameMatch[1].trim();
+              // Format 3: Look for any line that contains both "name" and what looks like a person's name
+              if (!detectedName && lowerLine.includes('name') && !lowerLine.includes('driver name:') && !lowerLine.includes('name searched')) {
+                const possibleNameMatch = line.match(/([A-Z][a-z]+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/);
+                if (possibleNameMatch && possibleNameMatch[1]) {
+                  let nameText = possibleNameMatch[1].trim();
                   
-                  // Remove DOB if it's on the same line
+                  // Remove DOB if present
                   const dobIndex = nameText.toLowerCase().indexOf('dob:');
                   if (dobIndex !== -1) {
                     nameText = nameText.substring(0, dobIndex).trim();
                   }
                   
-                  // Clean up the name
                   nameText = nameText.replace(/[^a-zA-Z\s]+$/, '').trim();
-                  detectedName = nameText;
-                }
-                // If not found on same line, try next line
-                else if (i + 1 < lines.length) {
-                  const nextLine = lines[i + 1].trim();
-                  if (nextLine && nextLine.length > 2 && /^[A-Z][a-z]+\s+[A-Z]/.test(nextLine)) {
-                    let nameText = nextLine;
-                    
-                    // Remove DOB if present
-                    const dobIndex = nameText.toLowerCase().indexOf('dob:');
-                    if (dobIndex !== -1) {
-                      nameText = nameText.substring(0, dobIndex).trim();
-                    }
-                    
-                    nameText = nameText.replace(/[^a-zA-Z\s]+$/, '').trim();
+                  
+                  // Validate it's actually a name
+                  if (nameText && nameText.split(' ').length >= 2 && nameText.split(' ').length <= 4) {
                     detectedName = nameText;
+                    console.log("Name detected via general name pattern:", detectedName);
                   }
                 }
               }
@@ -196,9 +193,10 @@ export default function MVRApprovalForm() {
                 }
               }
               
-              // Format 4: Direct name pattern detection (fallback)
+              // Format 4: Direct name pattern detection (fallback) - more aggressive
               if (!detectedName) {
-                const directNameMatch = line.match(/^([A-Z][a-z]+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)$/);
+                // Look for any line that looks like a name (2-4 capitalized words)
+                const directNameMatch = line.match(/^([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})$/);
                 if (directNameMatch && directNameMatch[1] && 
                     !lowerLine.includes('california') && 
                     !lowerLine.includes('texas') && 
@@ -206,12 +204,43 @@ export default function MVRApprovalForm() {
                     !lowerLine.includes('license') &&
                     !lowerLine.includes('date') &&
                     !lowerLine.includes('address') &&
-                    !lowerLine.includes('dob:')) {
+                    !lowerLine.includes('dob:') &&
+                    !lowerLine.includes('report') &&
+                    !lowerLine.includes('department') &&
+                    !lowerLine.includes('record') &&
+                    !lowerLine.includes('motor') &&
+                    !lowerLine.includes('vehicle')) {
                   let nameText = directNameMatch[1].trim();
                   
                   // Additional cleanup - ensure it's just a name
-                  if (nameText.split(' ').length >= 2 && nameText.split(' ').length <= 4) {
+                  const words = nameText.split(' ');
+                  if (words.length >= 2 && words.length <= 4) {
                     detectedName = nameText;
+                    console.log("Name detected via fallback pattern:", detectedName);
+                  }
+                }
+              }
+              
+              // Format 5: Very broad search for name patterns anywhere in the text
+              if (!detectedName && i < 30) { // Only check first 30 lines for performance
+                const broadNameMatch = line.match(/([A-Z][a-z]{2,}\s+[A-Z][a-z]{2,}(?:\s+[A-Z][a-z]{2,})?)/);
+                if (broadNameMatch && broadNameMatch[1]) {
+                  let nameText = broadNameMatch[1].trim();
+                  
+                  // Exclude common non-name patterns
+                  if (!lowerLine.includes('california') && 
+                      !lowerLine.includes('texas') && 
+                      !lowerLine.includes('arizona') &&
+                      !lowerLine.includes('department') &&
+                      !lowerLine.includes('motor') &&
+                      !lowerLine.includes('vehicle') &&
+                      !lowerLine.includes('record') &&
+                      !lowerLine.includes('report') &&
+                      !lowerLine.includes('license') &&
+                      nameText.split(' ').length >= 2 && 
+                      nameText.split(' ').length <= 4) {
+                    detectedName = nameText;
+                    console.log("Name detected via broad search:", detectedName);
                   }
                 }
               }
@@ -219,6 +248,9 @@ export default function MVRApprovalForm() {
             
             if (detectedName) {
               setDriverName(detectedName);
+              console.log("Final detected name set:", detectedName);
+            } else {
+              console.log("No name detected - this needs investigation");
             }
             
             // Store license status in the text for later evaluation
