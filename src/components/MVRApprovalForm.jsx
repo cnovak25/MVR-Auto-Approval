@@ -3,8 +3,8 @@ import * as pdfjsLib from "pdfjs-dist";
 import Tesseract from "tesseract.js";
 
 // Configure PDF.js worker
-// Try using a more reliable CDN
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/5.4.54/pdf.worker.min.js`;
+// Use local worker file to avoid CORS issues
+pdfjsLib.GlobalWorkerOptions.workerSrc = `/pdf.worker.min.mjs`;
 
 console.log("PDF.js worker configured:", pdfjsLib.GlobalWorkerOptions.workerSrc);
 
