@@ -38,10 +38,60 @@ export default function MVRApprovalForm() {
               const content = await page.getTextContent();
               text += content.items.map((s) => s.str).join(" ") + "\n";
             }
-            const nameMatch = text.match(/Name\s*[:\-]?\s*([A-Z][a-z]+\s+[A-Z][a-z]+)/i);
-            if (nameMatch && nameMatch[1]) {
-              setDriverName(nameMatch[1]);
+            
+            // Enhanced name detection for various MVR formats
+            const lines = text.split('\n');
+            let detectedName = null;
+            
+            for (let i = 0; i < lines.length; i++) {
+              const line = lines[i].trim();
+              const lowerLine = line.toLowerCase();
+              
+              // Format 1: "Name Searched" on one line, name on next line
+              if (lowerLine === 'name searched' && i + 1 < lines.length) {
+                const nextLine = lines[i + 1].trim();
+                if (nextLine && nextLine.length > 2) {
+                  detectedName = nextLine;
+                  break;
+                }
+              }
+              
+              // Format 2: "Name:" followed by name on same or next line
+              if (lowerLine.includes('name:') || lowerLine.includes('name ')) {
+                // Try to extract from same line first
+                const nameMatch = line.match(/name\s*[:\-]?\s*([A-Z][a-z]+\s+[A-Z][a-z]+.*)/i);
+                if (nameMatch && nameMatch[1]) {
+                  detectedName = nameMatch[1].trim();
+                  break;
+                }
+                // If not found on same line, try next line
+                else if (i + 1 < lines.length) {
+                  const nextLine = lines[i + 1].trim();
+                  if (nextLine && nextLine.length > 2 && /^[A-Z][a-z]+\s+[A-Z]/.test(nextLine)) {
+                    detectedName = nextLine;
+                    break;
+                  }
+                }
+              }
+              
+              // Format 3: Direct name pattern detection (fallback)
+              const directNameMatch = line.match(/^([A-Z][a-z]+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)$/);
+              if (directNameMatch && directNameMatch[1] && 
+                  !lowerLine.includes('california') && 
+                  !lowerLine.includes('texas') && 
+                  !lowerLine.includes('arizona') &&
+                  !lowerLine.includes('license') &&
+                  !lowerLine.includes('date') &&
+                  !lowerLine.includes('address')) {
+                detectedName = directNameMatch[1].trim();
+                break;
+              }
             }
+            
+            if (detectedName) {
+              setDriverName(detectedName);
+            }
+            
             resolve(text);
           } catch (pdfError) {
             reject(pdfError);
