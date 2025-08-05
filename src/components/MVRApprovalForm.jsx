@@ -93,6 +93,16 @@ export default function MVRApprovalForm() {
         continue;
       }
       
+      // Check for "NONE TO REPORT" patterns - this indicates clean record
+      if (lowerLine.includes('*** none to report ***') || 
+          lowerLine.includes('none to report') || 
+          lowerLine.includes('no violations') || 
+          lowerLine.includes('no accidents') ||
+          lowerLine.includes('clean record')) {
+        // This section has no violations/accidents
+        continue;
+      }
+      
       if (lowerLine.includes('suspensions/revocations') || lowerLine.includes('license and permit')) {
         inViolationsSection = false;
         inAccidentsSection = false;
@@ -322,14 +332,64 @@ Suspensions/Revocations
 ACTIONS	ORD/DATE	EFF/DATE	CLEAR/DATE	END/DATE	CODE	AVD	DESCRIPTION	NEW SUSP
 SUSPENSION	12/24/2024	01/02/2025		02/19/2025	96A	CA02	IMMEDIATE SUSP-EXCESSIVE BLOOD ALCH`;
               
-              console.log("Testing with sample MVR data");
+              console.log("Testing with Edgar's MVR (2 violations, DUI)");
               const evaluation = evaluateMVR(sampleMVR);
               setResult(evaluation);
               setDriverName("Edgar Navarro");
             }}
             className="bg-purple-600 text-white px-4 py-2 rounded mb-4"
           >
-            Test with Sample MVR
+            Test Edgar (2 Violations + DUI)
+          </button>
+          
+          <button
+            type="button"
+            onClick={() => {
+              const cleanMVR = `Name:  	William Allen Hibbens
+DOB:  	08/25/****
+ 	 	 	 
+ 
+The following are included in this report:
+Search Type   	Detail   	Status   
+Motor Vehicle Records Search   	Texas (license 52270616)    	Complete
+ 
+Motor Vehicle Records Search
+State	 	Texas
+License	 	52270616
+Name Searched	 	William Allen Hibbens
+DOB Searched	 	08/25/****
+Search ID	 	2369990
+Date Ordered	 	07/28/2025
+Date Completed	 	07/28/2025
+Results
+TEXASDriver Record - D2523	Order Date: 07/28/2025	Seq #: 0
+Host Used:	Online	Bill Code:	
+Rec Type:	STANDARD	Reference:	
+License:	52270616
+Name:	HIBBENS, WILLIAM ALLEN
+Address:	10034 COMANCHE LN
+City, St:	HOUSTON, TX 77041
+Sex:		Weight:		DOB:	08/25/****		
+Eyes:		Height:		Iss Date:			
+Hair:				Exp Date:	08/25/2033		
+Year License First Issued: 06/05/2025	STATUS:VALID
+MVR Score: 1 STANDARD
+Violations/ConvictionsFailures To Appear Accidents
+*** NONE TO REPORT ***
+Suspensions/Revocations
+*** NO ACTIVITY ***
+License and Permit Information
+License: PERSONAL	Issue:	Expire: 08/25/2033	Status: VALID		
+Class: C	SINGLE VEH < 26K`;
+              
+              console.log("Testing with William's clean MVR (0 violations)");
+              const evaluation = evaluateMVR(cleanMVR);
+              setResult(evaluation);
+              setDriverName("William Allen Hibbens");
+            }}
+            className="bg-green-600 text-white px-4 py-2 rounded mb-4 ml-2"
+          >
+            Test William (Clean Record)
           </button>
         </div>
         
