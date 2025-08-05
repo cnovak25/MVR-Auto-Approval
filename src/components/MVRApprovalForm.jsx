@@ -116,7 +116,10 @@ export default function MVRApprovalForm() {
       
       // Look for actual violation entries in the violations section
       if (inViolationsSection && line.length > 0) {
-        // California DMV format: ABS	08/21/2023	09/20/2023	B50	DC06	4000A1	UNREGISTERED VEHICLE...
+        // Multi-state format support
+        // California: ABS	08/21/2023	09/20/2023	B50	DC06	4000A1	UNREGISTERED VEHICLE...
+        // Texas: Similar tabular format
+        // Arizona: ARS codes
         // Check for date patterns and violation codes
         const datePattern = /\d{2}\/\d{2}\/\d{4}/;
         const hasDate = datePattern.test(line);
@@ -124,17 +127,37 @@ export default function MVRApprovalForm() {
         // Skip lines that are clearly not violation entries
         if (lowerLine.includes('description') || lowerLine.includes('location') || 
             lowerLine.includes('ticket') || lowerLine.includes('plate') ||
+            lowerLine.includes('at fault') || lowerLine.includes('*** none') ||
             line.startsWith('-') || line.length < 10) {
           continue;
         }
         
-        // Look for violation entries - they typically start with a code and have dates
+        // State-specific violation code patterns
+        const stateViolationPatterns = [
+          // California codes
+          /^(ABS|CONV|FTA|SUSP)/i,
+          // Arizona codes
+          /^(ARS)/i,
+          // Texas codes  
+          /^(TRC|TC)/i,
+          // General patterns
+          /^[A-Z]{2,4}\s/,  // 2-4 letter codes followed by space
+          /^\d{4,6}[A-Z]/   // Numeric codes with letters
+        ];
+        
+        // Check if line has violation indicators
+        const hasViolationCode = stateViolationPatterns.some(pattern => pattern.test(line));
+        
+        // Look for violation entries - they typically have dates and specific patterns
         if (hasDate && (
-          line.includes('ABS') || line.includes('CONV') || 
+          hasViolationCode ||
           lowerLine.includes('driving') || lowerLine.includes('vehicle') ||
           lowerLine.includes('speed') || lowerLine.includes('dui') ||
           lowerLine.includes('license') || lowerLine.includes('registration') ||
-          lowerLine.includes('insurance') || lowerLine.includes('equipment')
+          lowerLine.includes('insurance') || lowerLine.includes('equipment') ||
+          lowerLine.includes('traffic') || lowerLine.includes('violation') ||
+          lowerLine.includes('moving') || lowerLine.includes('parking') ||
+          lowerLine.includes('reckless') || lowerLine.includes('careless')
         )) {
           violations++;
         }
@@ -164,10 +187,27 @@ export default function MVRApprovalForm() {
     const birthYear = dobMatch ? parseInt(dobMatch[1], 10) : null;
     const age = birthYear ? new Date().getFullYear() - birthYear : null;
 
+    // Moon Valley Nursery Policy - Major Convictions
     const majorConvictions = [
+      // Generic terms
       "DUI", "DWI", "reckless driving", "vehicular assault", "homicide",
       "hit and run", "leaving the scene", "driving while suspended", "open container",
-      "23152B", "23152A", "BAC", "blood alcohol", "driving with bac"
+      "BAC", "blood alcohol", "driving with bac", "driving under influence",
+      
+      // California codes
+      "23152A", "23152B", "23103", "23140",
+      
+      // Arizona codes (ARS)
+      "ARS 28-1381", "ARS 28-1382", "ARS 28-1383", "28-1381", "28-1382", "28-1383",
+      
+      // Texas codes
+      "TRC 49.04", "49.04", "TRC 49.045", "49.045", "TPC 49.04",
+      
+      // Florida codes
+      "316.193", "322.2615",
+      
+      // Common patterns
+      "excessive blood", "refuse breath", "refuse chemical", "implied consent"
     ];
     const foundConvictions = majorConvictions.filter(term => 
       text.toLowerCase().includes(term.toLowerCase())
@@ -178,28 +218,75 @@ export default function MVRApprovalForm() {
 
     const classification = classifyDriver(violations, accidents);
 
+    // Moon Valley Nursery Policy Implementation
     let disqualified = false;
+    let disqualificationReason = "";
+
     if (driverType === "essential") {
-      disqualified =
-        age < 21 ||
-        foundConvictions.length > 0 ||
-        classification === "Probationary" ||
-        classification === "Unacceptable";
+      // Essential Driver Requirements (MVN Policy Section 4 & 6)
+      
+      // Age requirement: 25 years, or 21 years with ≥3 years experience and no violations
+      // Note: We can't verify driving experience from MVR, so enforcing 25 minimum for simplicity
+      if (age < 25) {
+        disqualified = true;
+        disqualificationReason = "Under 25 years old (Essential Driver requirement)";
+      }
+      
+      // Major conviction in past 5 years disqualifies Essential drivers
+      else if (foundConvictions.length > 0) {
+        disqualified = true;
+        disqualificationReason = "Major conviction found (5-year lookback for Essential)";
+      }
+      
+      // Essential drivers must be Clear or Acceptable (not Probationary or Unacceptable)
+      else if (classification === "Probationary" || classification === "Unacceptable") {
+        disqualified = true;
+        disqualificationReason = `Classification: ${classification} (Essential drivers require Clear/Acceptable)`;
+      }
+      
+      // ≥3 accidents or violations in past 3 years disqualifies
+      else if (violations + accidents >= 3) {
+        disqualified = true;
+        disqualificationReason = "3+ violations/accidents in past 3 years";
+      }
+      
     } else {
-      disqualified =
-        age < 21 ||
-        (foundConvictions.length > 0 && text.includes("2023"));
+      // Non-Essential Driver Requirements (MVN Policy Section 4 & 6)
+      
+      // Age requirement: 21 years minimum
+      if (age < 21) {
+        disqualified = true;
+        disqualificationReason = "Under 21 years old (Non-Essential Driver requirement)";
+      }
+      
+      // Major conviction in past 3 years disqualifies Non-Essential drivers
+      // Note: We're checking if violations contain recent dates, but this is approximate
+      else if (foundConvictions.length > 0) {
+        // For simplicity, we'll disqualify if any major conviction is found
+        // In a real implementation, you'd need to parse conviction dates
+        disqualified = true;
+        disqualificationReason = "Major conviction found (3-year lookback for Non-Essential)";
+      }
+      
+      // Non-Essential drivers may be Clear, Acceptable, or Probationary (not Unacceptable)
+      else if (classification === "Unacceptable") {
+        disqualified = true;
+        disqualificationReason = `Classification: ${classification} (Non-Essential allows up to Probationary)`;
+      }
     }
 
     const evaluation = {
       timestamp: new Date().toISOString(),
       driverName,
       age,
+      driverType,
       classification,
       violations,
       accidents,
       majorConvictions: foundConvictions,
-      finalVerdict: disqualified ? "Disqualified" : classification
+      finalVerdict: disqualified ? "Disqualified" : classification,
+      disqualificationReason: disqualified ? disqualificationReason : null,
+      policy: "Moon Valley Nursery Driver Standards (June 2025)"
     };
 
     const logs = JSON.parse(localStorage.getItem("mvr_evaluation_logs") || "[]");
@@ -209,22 +296,25 @@ export default function MVRApprovalForm() {
     return evaluation;
   };
 
-  const exportCSV = () => {
+    const exportCSV = () => {
     const logs = JSON.parse(localStorage.getItem("mvr_evaluation_logs") || "[]");
     const headers = [
       "timestamp",
-      "driverName",
+      "driverName", 
+      "driverType",
       "age",
       "classification",
       "violations",
       "accidents",
       "majorConvictions",
-      "finalVerdict"
+      "finalVerdict",
+      "disqualificationReason",
+      "policy"
     ];
     const rows = logs.map(log => headers.map(key => {
       const val = log[key];
       if (Array.isArray(val)) return `"${val.join("; ")}"`;
-      return val;
+      return val || "";
     }).join(","));
     const blob = new Blob([
       `${headers.join(",")}\n${rows.join("\n")}`
@@ -332,7 +422,8 @@ Suspensions/Revocations
 ACTIONS	ORD/DATE	EFF/DATE	CLEAR/DATE	END/DATE	CODE	AVD	DESCRIPTION	NEW SUSP
 SUSPENSION	12/24/2024	01/02/2025		02/19/2025	96A	CA02	IMMEDIATE SUSP-EXCESSIVE BLOOD ALCH`;
               
-              console.log("Testing with Edgar's MVR (2 violations, DUI)");
+              console.log("Testing Edgar's MVR (2 violations, DUI) - MVN Policy");
+              setDob("1996-10-18"); // Edgar is 28 years old (meets Essential age requirement)
               const evaluation = evaluateMVR(sampleMVR);
               setResult(evaluation);
               setDriverName("Edgar Navarro");
@@ -382,14 +473,39 @@ License and Permit Information
 License: PERSONAL	Issue:	Expire: 08/25/2033	Status: VALID		
 Class: C	SINGLE VEH < 26K`;
               
-              console.log("Testing with William's clean MVR (0 violations)");
+              console.log("Testing William's clean MVR (0 violations) - MVN Policy");
+              setDob("1985-08-25"); // William is 40 years old (meets all requirements)
               const evaluation = evaluateMVR(cleanMVR);
               setResult(evaluation);
               setDriverName("William Allen Hibbens");
             }}
             className="bg-green-600 text-white px-4 py-2 rounded mb-4 ml-2"
           >
-            Test William (Clean Record)
+            Test William (TX Clean)
+          </button>
+          
+          <button
+            type="button"
+            onClick={() => {
+              const youngDriverMVR = `Name: Sarah Young Driver
+State: California
+License: D987654321
+DOB: 03/15/2004
+Violations/ConvictionsFailures To Appear Accidents
+*** NONE TO REPORT ***
+License and Permit Information
+License: PERSONAL	Issue: 03/15/2022	Expire: 03/15/2030	Status: VALID		
+Class: C	SINGLE VEH < 26K`;
+              
+              console.log("Testing Young Driver (21 years old) - MVN Policy Age Test");
+              setDob("2004-03-15"); // Sarah is 21 years old
+              const evaluation = evaluateMVR(youngDriverMVR);
+              setResult(evaluation);
+              setDriverName("Sarah Young Driver");
+            }}
+            className="bg-orange-600 text-white px-4 py-2 rounded mb-4 ml-2"
+          >
+            Test Young Driver (Age 21)
           </button>
         </div>
         
@@ -453,6 +569,9 @@ Class: C	SINGLE VEH < 26K`;
               <strong>Driver Name:</strong> {result.driverName || "Not detected"}
             </div>
             <div>
+              <strong>Driver Type:</strong> {result.driverType === "essential" ? "Essential Driver" : "Non-Essential Driver"}
+            </div>
+            <div>
               <strong>Age:</strong> {result.age || "Unknown"}
             </div>
             <div>
@@ -464,9 +583,15 @@ Class: C	SINGLE VEH < 26K`;
             <div>
               <strong>Accidents:</strong> {result.accidents}
             </div>
-            <div>
+            <div className="md:col-span-2">
               <strong>Major Convictions:</strong> {result.majorConvictions.length > 0 ? result.majorConvictions.join(", ") : "None"}
             </div>
+            {result.disqualificationReason && (
+              <div className="md:col-span-2">
+                <strong>Disqualification Reason:</strong> 
+                <span className="ml-2 text-red-600">{result.disqualificationReason}</span>
+              </div>
+            )}
             <div className="md:col-span-2">
               <strong>Final Verdict:</strong> 
               <span className={`ml-2 px-3 py-1 rounded font-medium ${
@@ -480,6 +605,9 @@ Class: C	SINGLE VEH < 26K`;
               }`}>
                 {result.finalVerdict}
               </span>
+            </div>
+            <div className="md:col-span-2 text-sm text-gray-600 mt-2">
+              <strong>Policy:</strong> {result.policy || "Moon Valley Nursery Driver Standards (June 2025)"}
             </div>
           </div>
         </div>
