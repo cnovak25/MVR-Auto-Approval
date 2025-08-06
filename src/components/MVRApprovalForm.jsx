@@ -48,6 +48,19 @@ export default function MVRApprovalForm() {
             // Debug: Log first 30 lines to console to help troubleshoot
             console.log("PDF Text Lines (first 30):", lines.slice(0, 30));
             console.log("Full PDF text sample:", text.substring(0, 1000));
+            console.log("Total lines found:", lines.length);
+            
+            // If we have very few lines, the PDF might be parsed as one long string
+            // Try to split by common delimiters as well
+            if (lines.length < 10) {
+              console.log("⚠️ Few lines detected, attempting alternative parsing...");
+              const alternativeLines = text.split(/(?:\n|  (?=[A-Z])|(?<=:)  )/);
+              console.log("Alternative parsing found", alternativeLines.length, "segments");
+              if (alternativeLines.length > lines.length) {
+                lines.push(...alternativeLines);
+                console.log("Combined lines array now has", lines.length, "elements");
+              }
+            }
             
             // Additional debug: Look for any lines containing status-related keywords
             console.log("🔍 Scanning for license status keywords in document...");
@@ -594,6 +607,72 @@ export default function MVRApprovalForm() {
                     console.log("✓ Name detected via broad search:", detectedName);
                     break;
                   }
+                }
+              }
+            }
+            
+            // If line-based parsing failed, try direct text searching
+            if (!detectedName) {
+              console.log("🔍 Line-based name detection failed, trying direct text search...");
+              
+              // Look for "Name Searched   Edgar Navarro" pattern in the full text
+              const nameSearchedMatch = text.match(/Name Searched\s+([A-Z][a-z]+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i);
+              if (nameSearchedMatch && nameSearchedMatch[1]) {
+                detectedName = nameSearchedMatch[1].trim();
+                console.log("✅ Name detected via direct text search (Name Searched):", detectedName);
+              }
+              
+              // Look for "Name:   Edgar Navarro" pattern
+              if (!detectedName) {
+                const nameColonMatch = text.match(/Name:\s+([A-Z][a-z]+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i);
+                if (nameColonMatch && nameColonMatch[1]) {
+                  detectedName = nameColonMatch[1].trim();
+                  console.log("✅ Name detected via direct text search (Name:):", detectedName);
+                }
+              }
+              
+              // Look for the legal name format "NAVARROCARBAJAL, EDGAR ULISES"
+              if (!detectedName) {
+                const legalNameMatch = text.match(/Name:\s+([A-Z]+),\s+([A-Z]+(?:\s+[A-Z]+)?)/);
+                if (legalNameMatch) {
+                  // Reconstruct as "First Last" from "LAST, FIRST MIDDLE"
+                  const lastName = legalNameMatch[1];
+                  const firstAndMiddle = legalNameMatch[2];
+                  const nameParts = firstAndMiddle.split(' ');
+                  const firstName = nameParts[0];
+                  detectedName = `${firstName} ${lastName}`.toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+                  console.log("✅ Name detected via legal name format:", detectedName);
+                }
+              }
+            }
+            
+            // Direct license status detection from full text
+            if (!licenseStatus) {
+              console.log("🔍 Line-based license status detection failed, trying direct text search...");
+              
+              // Look for "Status: SUSPENDED" pattern in full text
+              const statusMatch = text.match(/Status:\s*(VALID|ACTIVE|SUSPENDED|REVOKED|CANCELLED|EXPIRED)/i);
+              if (statusMatch && statusMatch[1]) {
+                licenseStatus = statusMatch[1].toUpperCase();
+                console.log("✅ License status detected via direct text search:", licenseStatus);
+              }
+            }
+            
+            // Direct license status explanation detection
+            if (!licenseStatusExplanation) {
+              console.log("🔍 Looking for license status explanation in full text...");
+              
+              // Look for "License Status Explanation:MANDATORY SUSP/REVK" pattern
+              const explanationMatch = text.match(/License Status Explanation:\s*(.+?)(?:\s|$)/i);
+              if (explanationMatch && explanationMatch[1]) {
+                const explanation = explanationMatch[1].trim();
+                console.log("📋 Found explanation via direct search:", explanation);
+                if (explanation.toLowerCase().includes('susp')) {
+                  licenseStatusExplanation = "SUSPENDED";
+                  console.log("✅ Status explanation detected via direct search: SUSPENDED");
+                } else if (explanation.toLowerCase().includes('revk') || explanation.toLowerCase().includes('revoked')) {
+                  licenseStatusExplanation = "REVOKED";
+                  console.log("✅ Status explanation detected via direct search: REVOKED");
                 }
               }
             }
