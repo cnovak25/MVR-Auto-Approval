@@ -322,8 +322,8 @@ export default function MVRApprovalForm() {
               if (lowerLine.includes('status:') || lowerLine.startsWith('status:') || lowerLine.includes('license status')) {
                 console.log("🔍 Found license status line:", line);
                 
-                // First try to get status from same line
-                const statusMatch = line.match(/(?:license\s+)?status:\s*([A-Z]{4,})/i);
+                // First try to get status from same line - look for patterns like "Status: SUSPENDED"
+                const statusMatch = line.match(/status:\s*([A-Z]{4,})/i);
                 if (statusMatch && statusMatch[1] && statusMatch[1].length > 3) {
                   const status = statusMatch[1].toUpperCase();
                   console.log("📋 Checking status from same line:", status);
@@ -355,6 +355,20 @@ export default function MVRApprovalForm() {
                 }
               }
               
+              // Specific pattern for California MVR format - "Status: SUSPENDED" etc.
+              if (!licenseStatus && lowerLine.includes('status:') && !lowerLine.includes('explanation')) {
+                console.log("🔍 Checking California MVR status format:", line);
+                const calStatusMatch = line.match(/status:\s*([a-zA-Z]+)/i);
+                if (calStatusMatch && calStatusMatch[1]) {
+                  const status = calStatusMatch[1].toUpperCase();
+                  console.log("📋 Found California status:", status);
+                  if (/^(VALID|ACTIVE|SUSPENDED|REVOKED|CANCELLED|EXPIRED)$/i.test(status)) {
+                    licenseStatus = status;
+                    console.log("✅ License status detected (California format):", licenseStatus);
+                  }
+                }
+              }
+              
               // Also check for standalone status lines after "Status:" appears
               if (licenseStatus === null && /^(VALID|ACTIVE|SUSPENDED|REVOKED|CANCELLED|EXPIRED)$/i.test(line)) {
                 // Look back a few lines to see if this follows a "Status:" line
@@ -368,20 +382,27 @@ export default function MVRApprovalForm() {
               
               // License Status Explanation Detection - extract key status words only
               if (lowerLine.includes('license status explanation:') || lowerLine.includes('status explanation:')) {
+                console.log("🔍 Found license status explanation:", line);
                 const explanationMatch = line.match(/(?:license\s+)?status\s+explanation:\s*(.+)/i);
                 if (explanationMatch && explanationMatch[1]) {
                   let explanation = explanationMatch[1].trim();
+                  console.log("📋 Raw explanation:", explanation);
                   // Extract key status words from explanation
                   if (explanation.toLowerCase().includes('susp')) {
                     licenseStatusExplanation = "SUSPENDED";
+                    console.log("✅ Status explanation detected: SUSPENDED");
                   } else if (explanation.toLowerCase().includes('revk') || explanation.toLowerCase().includes('revoked')) {
                     licenseStatusExplanation = "REVOKED";
+                    console.log("✅ Status explanation detected: REVOKED");
                   } else if (explanation.toLowerCase().includes('valid')) {
                     licenseStatusExplanation = "VALID";
+                    console.log("✅ Status explanation detected: VALID");
                   } else if (explanation.toLowerCase().includes('expired')) {
                     licenseStatusExplanation = "EXPIRED";
+                    console.log("✅ Status explanation detected: EXPIRED");
                   } else if (explanation.toLowerCase().includes('cancelled')) {
                     licenseStatusExplanation = "CANCELLED";
+                    console.log("✅ Status explanation detected: CANCELLED");
                   } else {
                     // Keep first word only if it's a status-like term
                     const firstWord = explanation.split(/\s+/)[0].toUpperCase();
@@ -397,17 +418,23 @@ export default function MVRApprovalForm() {
                   const nextLine = lines[i + 1].trim();
                   if (nextLine && nextLine.length > 2) {
                     let explanation = nextLine;
+                    console.log("📋 Raw explanation (next line):", explanation);
                     // Extract key status words from explanation
                     if (explanation.toLowerCase().includes('susp')) {
                       licenseStatusExplanation = "SUSPENDED";
+                      console.log("✅ Status explanation detected (next line): SUSPENDED");
                     } else if (explanation.toLowerCase().includes('revk') || explanation.toLowerCase().includes('revoked')) {
                       licenseStatusExplanation = "REVOKED";
+                      console.log("✅ Status explanation detected (next line): REVOKED");
                     } else if (explanation.toLowerCase().includes('valid')) {
                       licenseStatusExplanation = "VALID";
+                      console.log("✅ Status explanation detected (next line): VALID");
                     } else if (explanation.toLowerCase().includes('expired')) {
                       licenseStatusExplanation = "EXPIRED";
+                      console.log("✅ Status explanation detected (next line): EXPIRED");
                     } else if (explanation.toLowerCase().includes('cancelled')) {
                       licenseStatusExplanation = "CANCELLED";
+                      console.log("✅ Status explanation detected (next line): CANCELLED");
                     } else {
                       // Keep first word only if it's a status-like term
                       const firstWord = explanation.split(/\s+/)[0].toUpperCase();
