@@ -753,103 +753,126 @@ export default function MVRApprovalForm() {
     let inViolationsSection = false;
     let inAccidentsSection = false;
     
+    // Debug logging
+    console.log("🚗 Starting violation/accident detection...");
+    
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
       const lowerLine = line.toLowerCase();
       
       // Detect section headers
-      if (lowerLine.includes('violations/convictions') || lowerLine.includes('violations') && lowerLine.includes('accidents')) {
+      if (lowerLine.includes('violations/convictions') || 
+          (lowerLine.includes('violations') && lowerLine.includes('accidents'))) {
         inViolationsSection = true;
         inAccidentsSection = false;
+        console.log("📋 Found violations section header at line", i);
         continue;
       }
       
-      // Check for "NONE TO REPORT" patterns - this indicates clean record
-      if (lowerLine.includes('*** none to report ***') || 
+      // Check for "*** NO ACTIVITY ***" patterns - this indicates clean record
+      if (lowerLine.includes('*** no activity ***') || 
+          lowerLine.includes('*** none to report ***') || 
           lowerLine.includes('none to report') || 
           lowerLine.includes('no violations') || 
           lowerLine.includes('no accidents') ||
           lowerLine.includes('clean record')) {
-        // This section has no violations/accidents
+        console.log("✅ Found clean record indicator:", line);
         continue;
       }
       
-      if (lowerLine.includes('suspensions/revocations') || lowerLine.includes('license and permit')) {
+      // End of violations section
+      if (lowerLine.includes('suspensions/revocations') || 
+          lowerLine.includes('license and permit') ||
+          lowerLine.includes('license:') ||
+          lowerLine.includes('cdl medical')) {
+        if (inViolationsSection) {
+          console.log("📋 End of violations section at line", i);
+        }
         inViolationsSection = false;
         inAccidentsSection = false;
         continue;
       }
       
-      // Skip table headers
-      if (lowerLine.includes('type') && lowerLine.includes('viol') && lowerLine.includes('conv')) {
+      // Skip table headers and descriptive lines
+      if (lowerLine.includes('typeviol') || lowerLine.includes('conv acd') || 
+          lowerLine.includes('description') || lowerLine.includes('location') || 
+          lowerLine.includes('ticket') || lowerLine.includes('plate') ||
+          lowerLine.includes('at fault') || lowerLine.includes('pt abs') ||
+          line.startsWith('-') || line.length < 15) {
         continue;
       }
       
       // Look for actual violation entries in the violations section
       if (inViolationsSection && line.length > 0) {
-        // Multi-state format support
-        // California: ABS	08/21/2023	09/20/2023	B50	DC06	4000A1	UNREGISTERED VEHICLE...
-        // Texas: Similar tabular format
-        // Arizona: ARS codes
-        // Check for date patterns and violation codes
+        console.log(`🔍 Checking violations line ${i}: "${line}"`);
+        
+        // Check for date patterns (MM/DD/YYYY)
         const datePattern = /\d{2}\/\d{2}\/\d{4}/;
         const hasDate = datePattern.test(line);
         
-        // Skip lines that are clearly not violation entries
-        if (lowerLine.includes('description') || lowerLine.includes('location') || 
-            lowerLine.includes('ticket') || lowerLine.includes('plate') ||
-            lowerLine.includes('at fault') || lowerLine.includes('*** none') ||
-            line.startsWith('-') || line.length < 10) {
-          continue;
+        // California DMV format: "ABS 04/25/2024 07/23/2024 M17 MA1721453B FAIL TO STOP..."
+        // Look for violation indicators:
+        // 1. Has dates (violation date and conviction date)
+        // 2. Has violation codes or descriptions
+        // 3. Contains violation-related keywords
+        
+        if (hasDate) {
+          console.log("📅 Line has dates:", line);
+          
+          // California violation type codes
+          const violationTypes = ['ABS', 'CONV', 'FTA', 'SUSP', 'CDL', 'V', 'C', 'M'];
+          const hasViolationType = violationTypes.some(type => {
+            const regex = new RegExp(`\\b${type}\\b`, 'i');
+            return regex.test(line);
+          });
+          
+          // Look for violation descriptions
+          const violationKeywords = [
+            'fail to stop', 'failure to', 'speed', 'driving', 'vehicle', 'traffic',
+            'dui', 'dwi', 'license', 'registration', 'insurance', 'equipment',
+            'reckless', 'careless', 'following', 'lane', 'signal', 'turn',
+            'parking', 'stop sign', 'red light', 'yield', 'unsafe', 'improper'
+          ];
+          
+          const hasViolationKeyword = violationKeywords.some(keyword => 
+            lowerLine.includes(keyword));
+          
+          // Check for ticket/case numbers (like M17MA1721453B)
+          const hasTicketNumber = /[A-Z]\d+[A-Z]*\d+[A-Z]*/.test(line);
+          
+          if (hasViolationType || hasViolationKeyword || hasTicketNumber) {
+            violations++;
+            console.log(`✅ VIOLATION DETECTED (${violations}): ${line}`);
+          } else {
+            console.log("❌ Line with dates but no violation indicators:", line);
+          }
         }
         
-        // State-specific violation code patterns
-        const stateViolationPatterns = [
-          // California codes
-          /^(ABS|CONV|FTA|SUSP)/i,
-          // Arizona codes
-          /^(ARS)/i,
-          // Texas codes  
-          /^(TRC|TC)/i,
-          // General patterns
-          /^[A-Z]{2,4}\s/,  // 2-4 letter codes followed by space
-          /^\d{4,6}[A-Z]/   // Numeric codes with letters
-        ];
-        
-        // Check if line has violation indicators
-        const hasViolationCode = stateViolationPatterns.some(pattern => pattern.test(line));
-        
-        // Look for violation entries - they typically have dates and specific patterns
-        if (hasDate && (
-          hasViolationCode ||
-          lowerLine.includes('driving') || lowerLine.includes('vehicle') ||
-          lowerLine.includes('speed') || lowerLine.includes('dui') ||
-          lowerLine.includes('license') || lowerLine.includes('registration') ||
-          lowerLine.includes('insurance') || lowerLine.includes('equipment') ||
-          lowerLine.includes('traffic') || lowerLine.includes('violation') ||
-          lowerLine.includes('moving') || lowerLine.includes('parking') ||
-          lowerLine.includes('reckless') || lowerLine.includes('careless')
-        )) {
+        // Also check for violations without strict date patterns (backup)
+        else if (lowerLine.includes('violation') || lowerLine.includes('conviction') ||
+                 lowerLine.includes('fail to') || lowerLine.includes('speed') ||
+                 lowerLine.includes('dui') || lowerLine.includes('reckless')) {
           violations++;
+          console.log(`✅ VIOLATION DETECTED (backup method ${violations}): ${line}`);
         }
       }
       
       // Look for accident entries
-      if (lowerLine.includes('accident') && 
-          (lowerLine.includes('at fault') || lowerLine.includes('collision') ||
-           lowerLine.includes('property damage') || lowerLine.includes('injury'))) {
-        accidents++;
-      }
-      
-      // Alternative accident detection - look for accident-specific codes or descriptions
-      if (inViolationsSection && line.length > 0) {
-        if (lowerLine.includes('accident') || lowerLine.includes('collision') ||
-            lowerLine.includes('crash') || (lowerLine.includes('at fault') && lowerLine.includes('yes'))) {
+      if ((inViolationsSection || lowerLine.includes('accident')) && 
+          (lowerLine.includes('accident') || lowerLine.includes('collision') ||
+           lowerLine.includes('crash'))) {
+        
+        // Check if it's actually an accident record (not just the word "accident")
+        if (lowerLine.includes('at fault') || lowerLine.includes('property damage') ||
+            lowerLine.includes('injury') || lowerLine.includes('collision') ||
+            (lowerLine.includes('accident') && (lowerLine.includes('yes') || lowerLine.includes('no')))) {
           accidents++;
+          console.log(`✅ ACCIDENT DETECTED (${accidents}): ${line}`);
         }
       }
     }
     
+    console.log(`🏁 FINAL COUNT - Violations: ${violations}, Accidents: ${accidents}`);
     return { violations, accidents };
   };
 
