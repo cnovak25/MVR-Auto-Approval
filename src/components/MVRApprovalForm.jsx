@@ -47,8 +47,28 @@ export default function MVRApprovalForm() {
             
             // Debug: Log first 30 lines to console to help troubleshoot
             console.log("PDF Text Lines (first 30):", lines.slice(0, 30));
-            console.log("Full PDF text sample:", text.substring(0, 1000));
+            console.log("Full PDF text sample:", text.substring(0, 1500));
             console.log("Total lines found:", lines.length);
+            
+            // WISCONSIN MVR DEBUG: Look for Wisconsin-specific patterns
+            console.log("🔍 WISCONSIN MVR DEBUG - Looking for key patterns:");
+            const wisconsinPatterns = ['VIOL', 'ACCD', 'VIOLATIONS/CONVICTIONS', 'TYPE', 'GREGORY', 'SCHIMANSKI'];
+            wisconsinPatterns.forEach(pattern => {
+              const found = text.includes(pattern);
+              console.log(`- "${pattern}": ${found ? '✅ FOUND' : '❌ NOT FOUND'}`);
+              if (found) {
+                const lineNumber = lines.findIndex(line => line.includes(pattern));
+                console.log(`  Found on line ${lineNumber}: "${lines[lineNumber]}"`);
+              }
+            });
+            
+            // Show all lines that contain "VIOL" or "ACCD"
+            console.log("🔍 All lines containing VIOL or ACCD:");
+            lines.forEach((line, index) => {
+              if (line.includes('VIOL') || line.includes('ACCD')) {
+                console.log(`Line ${index}: "${line}"`);
+              }
+            });
             
             // If we have very few lines, the PDF might be parsed as one long string
             // Try to split by common delimiters as well
@@ -755,6 +775,8 @@ export default function MVRApprovalForm() {
     
     // Debug logging
     console.log("🚗 Starting violation/accident detection...");
+    console.log("🔍 Input text length:", text.length);
+    console.log("🔍 Input text preview:", text.substring(0, 500));
     
     // First pass: find where headers end (for Wisconsin columnar format)
     for (let i = 0; i < lines.length; i++) {
