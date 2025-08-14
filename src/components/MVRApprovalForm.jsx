@@ -746,15 +746,39 @@ export default function MVRApprovalForm() {
   };
 
   const countActualViolationsAndAccidents = (text) => {
-    // Enhanced parsing logic for California DMV format
+    // Enhanced parsing logic for multiple MVR formats (California, Wisconsin, etc.)
     const lines = text.split('\n');
     let violations = 0;
     let accidents = 0;
     let inViolationsSection = false;
-    let inAccidentsSection = false;
+    let headerEndLine = -1; // Track where table headers end
     
     // Debug logging
     console.log("🚗 Starting violation/accident detection...");
+    
+    // First pass: find where headers end (for Wisconsin columnar format)
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      const lowerLine = line.toLowerCase();
+      
+      if (lowerLine.includes('violations/convictions') || 
+          (lowerLine.includes('violations') && lowerLine.includes('accidents'))) {
+        inViolationsSection = true;
+        continue;
+      }
+      
+      if (inViolationsSection) {
+        // Look for PT which is typically the last header in Wisconsin format
+        if (line.trim() === 'PT' || line.trim() === 'ATFAULT') {
+          headerEndLine = i;
+          console.log(`📋 Headers end at line ${i} (${line.trim()})`);
+          break;
+        }
+      }
+    }
+    
+    // Second pass: detect violations and accidents
+    inViolationsSection = false;
     
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
@@ -764,7 +788,6 @@ export default function MVRApprovalForm() {
       if (lowerLine.includes('violations/convictions') || 
           (lowerLine.includes('violations') && lowerLine.includes('accidents'))) {
         inViolationsSection = true;
-        inAccidentsSection = false;
         console.log("📋 Found violations section header at line", i);
         continue;
       }
@@ -789,37 +812,74 @@ export default function MVRApprovalForm() {
           console.log("📋 End of violations section at line", i);
         }
         inViolationsSection = false;
-        inAccidentsSection = false;
         continue;
       }
       
-      // Skip table headers and descriptive lines
-      if (lowerLine.includes('typeviol') || lowerLine.includes('conv acd') || 
-          lowerLine.includes('description') || lowerLine.includes('location') || 
-          lowerLine.includes('ticket') || lowerLine.includes('plate') ||
-          lowerLine.includes('at fault') || lowerLine.includes('pt abs') ||
-          line.startsWith('-') || line.length < 15) {
-        continue;
-      }
-      
-      // Look for actual violation entries in the violations section
-      if (inViolationsSection && line.length > 0) {
+      // Process lines after headers end
+      if (inViolationsSection && line.length > 0 && i > headerEndLine) {
         console.log(`🔍 Checking violations line ${i}: "${line}"`);
         
         // Check for date patterns (MM/DD/YYYY)
         const datePattern = /\d{2}\/\d{2}\/\d{4}/;
         const hasDate = datePattern.test(line);
         
-        // California DMV format: "ABS 04/25/2024 07/23/2024 M17 MA1721453B FAIL TO STOP..."
-        // Look for violation indicators:
-        // 1. Has dates (violation date and conviction date)
-        // 2. Has violation codes or descriptions
-        // 3. Contains violation-related keywords
+        // Wisconsin Columnar Format: "VIOL" in TYPE column indicates start of violation record
+        if (line.trim() === 'VIOL') {
+          // Look ahead for dates in the next few lines to confirm this is a violation record
+          let foundViolationData = false;
+          for (let j = i + 1; j < Math.min(i + 10, lines.length); j++) {
+            const nextLine = lines[j].trim();
+            if (datePattern.test(nextLine)) {
+              foundViolationData = true;
+              break;
+            }
+            // Stop if we hit another record type
+            if (nextLine === 'ACCD' || nextLine === 'CONV' || nextLine === 'SUSP') {
+              break;
+            }
+          }
+          if (foundViolationData) {
+            violations++;
+            console.log(`✅ WISCONSIN VIOLATION DETECTED (columnar ${violations}): VIOL record starting at line ${i}`);
+          }
+        }
         
-        if (hasDate) {
+        // Wisconsin Columnar Format: "ACCD" in TYPE column indicates start of accident record
+        else if (line.trim() === 'ACCD') {
+          // Look ahead for dates or accident indicators
+          let foundAccidentData = false;
+          for (let j = i + 1; j < Math.min(i + 10, lines.length); j++) {
+            const nextLine = lines[j].trim();
+            if (datePattern.test(nextLine) || 
+                nextLine.toLowerCase().includes('accident') || 
+                nextLine.includes('*acc*') || nextLine.includes('** accident**')) {
+              foundAccidentData = true;
+              break;
+            }
+            // Stop if we hit another record type
+            if (nextLine === 'VIOL' || nextLine === 'CONV' || nextLine === 'SUSP') {
+              break;
+            }
+          }
+          if (foundAccidentData) {
+            accidents++;
+            console.log(`✅ WISCONSIN ACCIDENT DETECTED (columnar ${accidents}): ACCD record starting at line ${i}`);
+          }
+        }
+        
+        // California/Other state formats with single-line records
+        else if (line.startsWith('VIOL ') && hasDate) {
+          violations++;
+          console.log(`✅ SINGLE-LINE VIOLATION DETECTED (${violations}): ${line}`);
+        }
+        else if (line.startsWith('ACCD ') && hasDate) {
+          accidents++;
+          console.log(`✅ SINGLE-LINE ACCIDENT DETECTED (${accidents}): ${line}`);
+        }
+        else if (hasDate) {
           console.log("📅 Line has dates:", line);
           
-          // California violation type codes
+          // California/Multi-state violation type codes
           const violationTypes = ['ABS', 'CONV', 'FTA', 'SUSP', 'CDL', 'V', 'C', 'M'];
           const hasViolationType = violationTypes.some(type => {
             const regex = new RegExp(`\\b${type}\\b`, 'i');
@@ -857,17 +917,35 @@ export default function MVRApprovalForm() {
         }
       }
       
-      // Look for accident entries
+      // Look for accident entries (avoid double counting from Wisconsin format)
       if ((inViolationsSection || lowerLine.includes('accident')) && 
+          i > headerEndLine &&
           (lowerLine.includes('accident') || lowerLine.includes('collision') ||
-           lowerLine.includes('crash'))) {
+           lowerLine.includes('crash') || line.includes('** ACCIDENT**') || 
+           line.includes('*ACC*'))) {
         
-        // Check if it's actually an accident record (not just the word "accident")
-        if (lowerLine.includes('at fault') || lowerLine.includes('property damage') ||
-            lowerLine.includes('injury') || lowerLine.includes('collision') ||
-            (lowerLine.includes('accident') && (lowerLine.includes('yes') || lowerLine.includes('no')))) {
-          accidents++;
-          console.log(`✅ ACCIDENT DETECTED (${accidents}): ${line}`);
+        // Skip if we already counted this as part of an ACCD section
+        let alreadyCounted = false;
+        // Look back a few lines to see if we counted an ACCD section recently
+        for (let j = Math.max(0, i - 5); j < i; j++) {
+          const prevLine = lines[j].trim();
+          if (prevLine === 'ACCD') {
+            alreadyCounted = true;
+            break;
+          }
+        }
+        
+        if (!alreadyCounted) {
+          // Check if it's actually an accident record (not just the word "accident")
+          if (lowerLine.includes('at fault') || lowerLine.includes('property damage') ||
+              lowerLine.includes('injury') || lowerLine.includes('collision') ||
+              line.includes('** ACCIDENT**') || line.includes('*ACC*') ||
+              (lowerLine.includes('accident') && (lowerLine.includes('yes') || lowerLine.includes('no')))) {
+            accidents++;
+            console.log(`✅ ACCIDENT DETECTED (${accidents}): ${line}`);
+          }
+        } else {
+          console.log(`🔄 Skipping accident marker (already counted in ACCD section): ${line}`);
         }
       }
     }
