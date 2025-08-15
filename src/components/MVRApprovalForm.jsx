@@ -769,6 +769,10 @@ export default function MVRApprovalForm() {
   const countActualViolationsAndAccidents = (text) => {
     // Use Universal MVR Parser for all states
     const parser = new UniversalMVRParser();
+    console.log('🔍 TEXT BEING PARSED:', text.substring(0, 500) + '...');
+    console.log('🔍 CONTAINS 28-701A:', text.includes('28-701A'));
+    console.log('🔍 CONTAINS VIOL:', text.includes('VIOL'));
+    
     const result = parser.parseViolations(text);
     
     console.log(`🏁 UNIVERSAL PARSER RESULT - Violations: ${result.violations}, Accidents: ${result.accidents}`);
