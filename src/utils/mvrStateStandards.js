@@ -27,10 +27,10 @@ export const MVR_STATE_STANDARDS = {
 
   // Date Patterns by State
   DATE_PATTERNS: {
-    STANDARD: /\d{1,2}[\/-]\d{1,2}[\/-](\d{4}|\d{2})/g, // MM/DD/YYYY, MM-DD-YYYY, MM/DD/YY
-    ISO: /\d{4}-\d{2}-\d{2}/g, // YYYY-MM-DD
-    COMPACT: /\d{6,8}/g, // MMDDYYYY or MMDDYY
-    VERBAL: /(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2},?\s+\d{4}/gi
+    STANDARD: /\d{1,2}[\/-]\d{1,2}[\/-](\d{4}|\d{2})/, // MM/DD/YYYY, MM-DD-YYYY, MM/DD/YY (removed global flag)
+    ISO: /\d{4}-\d{2}-\d{2}/, // YYYY-MM-DD (removed global flag)
+    COMPACT: /\d{6,8}/, // MMDDYYYY or MMDDYY (removed global flag)
+    VERBAL: /(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2},?\s+\d{4}/i // Removed global flag
   },
 
   // Violation Indicators by State
