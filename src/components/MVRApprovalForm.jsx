@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import * as pdfjsLib from "pdfjs-dist";
 import Tesseract from "tesseract.js";
+import { UniversalMVRParser } from '../utils/mvrStateStandards';
 
 // Configure PDF.js worker
 // Use local worker file to avoid CORS issues
@@ -766,217 +767,13 @@ export default function MVRApprovalForm() {
   };
 
   const countActualViolationsAndAccidents = (text) => {
-    // Enhanced parsing logic for multiple MVR formats (California, Wisconsin, etc.)
-    const lines = text.split('\n');
-    let violations = 0;
-    let accidents = 0;
-    let inViolationsSection = false;
-    let headerEndLine = -1; // Track where table headers end
+    // Use Universal MVR Parser for all states
+    const parser = new UniversalMVRParser();
+    const result = parser.parseViolations(text);
     
-    // Debug logging
-    console.log("🚗 Starting violation/accident detection...");
-    console.log("🔍 Input text length:", text.length);
-    console.log("🔍 Input text preview:", text.substring(0, 500));
-    
-    // First pass: find where headers end (for Wisconsin columnar format)
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      const lowerLine = line.toLowerCase();
-      
-      if (lowerLine.includes('violations/convictions') || 
-          (lowerLine.includes('violations') && lowerLine.includes('accidents'))) {
-        inViolationsSection = true;
-        continue;
-      }
-      
-      if (inViolationsSection) {
-        // Look for PT which is typically the last header in Wisconsin format
-        if (line.trim() === 'PT' || line.trim() === 'ATFAULT') {
-          headerEndLine = i;
-          console.log(`📋 Headers end at line ${i} (${line.trim()})`);
-          break;
-        }
-      }
-    }
-    
-    // Second pass: detect violations and accidents
-    inViolationsSection = false;
-    
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      const lowerLine = line.toLowerCase();
-      
-      // Detect section headers
-      if (lowerLine.includes('violations/convictions') || 
-          (lowerLine.includes('violations') && lowerLine.includes('accidents'))) {
-        inViolationsSection = true;
-        console.log("📋 Found violations section header at line", i);
-        continue;
-      }
-      
-      // Check for "*** NO ACTIVITY ***" patterns - this indicates clean record
-      if (lowerLine.includes('*** no activity ***') || 
-          lowerLine.includes('*** none to report ***') || 
-          lowerLine.includes('none to report') || 
-          lowerLine.includes('no violations') || 
-          lowerLine.includes('no accidents') ||
-          lowerLine.includes('clean record')) {
-        console.log("✅ Found clean record indicator:", line);
-        continue;
-      }
-      
-      // End of violations section
-      if (lowerLine.includes('suspensions/revocations') || 
-          lowerLine.includes('license and permit') ||
-          lowerLine.includes('license:') ||
-          lowerLine.includes('cdl medical')) {
-        if (inViolationsSection) {
-          console.log("📋 End of violations section at line", i);
-        }
-        inViolationsSection = false;
-        continue;
-      }
-      
-      // Process lines after headers end
-      if (inViolationsSection && line.length > 0 && i > headerEndLine) {
-        console.log(`🔍 Checking violations line ${i}: "${line}"`);
-        
-        // Check for date patterns (MM/DD/YYYY)
-        const datePattern = /\d{2}\/\d{2}\/\d{4}/;
-        const hasDate = datePattern.test(line);
-        
-        // Wisconsin Columnar Format: "VIOL" in TYPE column indicates start of violation record
-        if (line.trim() === 'VIOL') {
-          // Look ahead for dates in the next few lines to confirm this is a violation record
-          let foundViolationData = false;
-          for (let j = i + 1; j < Math.min(i + 10, lines.length); j++) {
-            const nextLine = lines[j].trim();
-            if (datePattern.test(nextLine)) {
-              foundViolationData = true;
-              break;
-            }
-            // Stop if we hit another record type
-            if (nextLine === 'ACCD' || nextLine === 'CONV' || nextLine === 'SUSP') {
-              break;
-            }
-          }
-          if (foundViolationData) {
-            violations++;
-            console.log(`✅ WISCONSIN VIOLATION DETECTED (columnar ${violations}): VIOL record starting at line ${i}`);
-          }
-        }
-        
-        // Wisconsin Columnar Format: "ACCD" in TYPE column indicates start of accident record
-        else if (line.trim() === 'ACCD') {
-          // Look ahead for dates or accident indicators
-          let foundAccidentData = false;
-          for (let j = i + 1; j < Math.min(i + 10, lines.length); j++) {
-            const nextLine = lines[j].trim();
-            if (datePattern.test(nextLine) || 
-                nextLine.toLowerCase().includes('accident') || 
-                nextLine.includes('*acc*') || nextLine.includes('** accident**')) {
-              foundAccidentData = true;
-              break;
-            }
-            // Stop if we hit another record type
-            if (nextLine === 'VIOL' || nextLine === 'CONV' || nextLine === 'SUSP') {
-              break;
-            }
-          }
-          if (foundAccidentData) {
-            accidents++;
-            console.log(`✅ WISCONSIN ACCIDENT DETECTED (columnar ${accidents}): ACCD record starting at line ${i}`);
-          }
-        }
-        
-        // California/Other state formats with single-line records
-        else if (line.startsWith('VIOL ') && hasDate) {
-          violations++;
-          console.log(`✅ SINGLE-LINE VIOLATION DETECTED (${violations}): ${line}`);
-        }
-        else if (line.startsWith('ACCD ') && hasDate) {
-          accidents++;
-          console.log(`✅ SINGLE-LINE ACCIDENT DETECTED (${accidents}): ${line}`);
-        }
-        else if (hasDate) {
-          console.log("📅 Line has dates:", line);
-          
-          // California/Multi-state violation type codes
-          const violationTypes = ['ABS', 'CONV', 'FTA', 'SUSP', 'CDL', 'V', 'C', 'M'];
-          const hasViolationType = violationTypes.some(type => {
-            const regex = new RegExp(`\\b${type}\\b`, 'i');
-            return regex.test(line);
-          });
-          
-          // Look for violation descriptions
-          const violationKeywords = [
-            'fail to stop', 'failure to', 'speed', 'driving', 'vehicle', 'traffic',
-            'dui', 'dwi', 'license', 'registration', 'insurance', 'equipment',
-            'reckless', 'careless', 'following', 'lane', 'signal', 'turn',
-            'parking', 'stop sign', 'red light', 'yield', 'unsafe', 'improper'
-          ];
-          
-          const hasViolationKeyword = violationKeywords.some(keyword => 
-            lowerLine.includes(keyword));
-          
-          // Check for ticket/case numbers (like M17MA1721453B)
-          const hasTicketNumber = /[A-Z]\d+[A-Z]*\d+[A-Z]*/.test(line);
-          
-          if (hasViolationType || hasViolationKeyword || hasTicketNumber) {
-            violations++;
-            console.log(`✅ VIOLATION DETECTED (${violations}): ${line}`);
-          } else {
-            console.log("❌ Line with dates but no violation indicators:", line);
-          }
-        }
-        
-        // Also check for violations without strict date patterns (backup)
-        else if (lowerLine.includes('violation') || lowerLine.includes('conviction') ||
-                 lowerLine.includes('fail to') || lowerLine.includes('speed') ||
-                 lowerLine.includes('dui') || lowerLine.includes('reckless')) {
-          violations++;
-          console.log(`✅ VIOLATION DETECTED (backup method ${violations}): ${line}`);
-        }
-      }
-      
-      // Look for accident entries (avoid double counting from Wisconsin format)
-      if ((inViolationsSection || lowerLine.includes('accident')) && 
-          i > headerEndLine &&
-          (lowerLine.includes('accident') || lowerLine.includes('collision') ||
-           lowerLine.includes('crash') || line.includes('** ACCIDENT**') || 
-           line.includes('*ACC*'))) {
-        
-        // Skip if we already counted this as part of an ACCD section
-        let alreadyCounted = false;
-        // Look back a few lines to see if we counted an ACCD section recently
-        for (let j = Math.max(0, i - 5); j < i; j++) {
-          const prevLine = lines[j].trim();
-          if (prevLine === 'ACCD') {
-            alreadyCounted = true;
-            break;
-          }
-        }
-        
-        if (!alreadyCounted) {
-          // Check if it's actually an accident record (not just the word "accident")
-          if (lowerLine.includes('at fault') || lowerLine.includes('property damage') ||
-              lowerLine.includes('injury') || lowerLine.includes('collision') ||
-              line.includes('** ACCIDENT**') || line.includes('*ACC*') ||
-              (lowerLine.includes('accident') && (lowerLine.includes('yes') || lowerLine.includes('no')))) {
-            accidents++;
-            console.log(`✅ ACCIDENT DETECTED (${accidents}): ${line}`);
-          }
-        } else {
-          console.log(`🔄 Skipping accident marker (already counted in ACCD section): ${line}`);
-        }
-      }
-    }
-    
-    console.log(`🏁 FINAL COUNT - Violations: ${violations}, Accidents: ${accidents}`);
-    return { violations, accidents };
-  };
-
-  const evaluateMVR = (text, currentDriverName = null) => {
+    console.log(`🏁 UNIVERSAL PARSER RESULT - Violations: ${result.violations}, Accidents: ${result.accidents}`);
+    return result;
+  };  const evaluateMVR = (text, currentDriverName = null) => {
     const dobMatch = dob.match(/(\d{4})-(\d{2})-(\d{2})/);
     const birthYear = dobMatch ? parseInt(dobMatch[1], 10) : null;
     const age = birthYear ? new Date().getFullYear() - birthYear : null;
@@ -1019,31 +816,10 @@ export default function MVRApprovalForm() {
     const licenseStatusExplanationMatch = text.match(/__LICENSE_STATUS_EXPLANATION__:\s*(.+)/);
     const licenseStatusExplanation = licenseStatusExplanationMatch ? licenseStatusExplanationMatch[1] : null;
 
-    // Moon Valley Nursery Policy - Major Convictions
-    const majorConvictions = [
-      // Generic terms
-      "DUI", "DWI", "reckless driving", "vehicular assault", "homicide",
-      "hit and run", "leaving the scene", "driving while suspended", "open container",
-      "BAC", "blood alcohol", "driving with bac", "driving under influence",
-      
-      // California codes
-      "23152A", "23152B", "23103", "23140",
-      
-      // Arizona codes (ARS)
-      "ARS 28-1381", "ARS 28-1382", "ARS 28-1383", "28-1381", "28-1382", "28-1383",
-      
-      // Texas codes
-      "TRC 49.04", "49.04", "TRC 49.045", "49.045", "TPC 49.04",
-      
-      // Florida codes
-      "316.193", "322.2615",
-      
-      // Common patterns
-      "excessive blood", "refuse breath", "refuse chemical", "implied consent"
-    ];
-    const foundConvictions = majorConvictions.filter(term => 
-      text.toLowerCase().includes(term.toLowerCase())
-    );
+    // Use Universal MVR Parser for major convictions detection
+    const parser = new UniversalMVRParser();
+    const { state } = parser.detectState(text);
+    const foundConvictions = parser.checkMajorConvictions(text, state);
 
     // Use improved parsing logic to avoid false positives
     const { violations, accidents } = countActualViolationsAndAccidents(text);
