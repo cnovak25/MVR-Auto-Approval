@@ -695,10 +695,13 @@ export class UniversalMVRParser {
     const textLower = text.toLowerCase();
     const foundConvictions = [];
     
-    // Check generic convictions
+    // Check generic convictions with word boundaries to avoid false positives
     for (const conviction of MVR_STATE_STANDARDS.MAJOR_CONVICTIONS.GENERIC) {
-      if (textLower.includes(conviction.toLowerCase())) {
+      // Use word boundaries to ensure exact matches
+      const regex = new RegExp(`\\b${conviction.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+      if (regex.test(text)) {
         foundConvictions.push(conviction);
+        this.log(`✅ Major conviction detected: ${conviction}`);
       }
     }
     
@@ -706,8 +709,11 @@ export class UniversalMVRParser {
     const stateConvictions = MVR_STATE_STANDARDS.MAJOR_CONVICTIONS[state];
     if (stateConvictions) {
       for (const conviction of stateConvictions) {
-        if (textLower.includes(conviction.toLowerCase())) {
+        // Use word boundaries for state-specific codes too
+        const regex = new RegExp(`\\b${conviction.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+        if (regex.test(text)) {
           foundConvictions.push(conviction);
+          this.log(`✅ State-specific major conviction detected: ${conviction}`);
         }
       }
     }
